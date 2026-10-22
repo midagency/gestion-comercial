@@ -25,6 +25,11 @@ target_metadata = Base.metadata
 
 
 def get_url() -> str:
+    """URL síncrona para Alembic (psycopg2).
+
+    API (asyncpg) usa ``?ssl=require``.
+    Alembic (psycopg2) necesita ``?sslmode=require``.
+    """
     url = os.getenv("DATABASE_URL", "").strip()
     if not url:
         url = config.get_main_option("sqlalchemy.url") or ""
@@ -33,7 +38,6 @@ def get_url() -> str:
             "DATABASE_URL no está definida. En Render/Neon configurá "
             "postgresql+asyncpg://USER:PASS@HOST/DB?ssl=require"
         )
-    # Migraciones síncronas: cualquier driver async/sync → psycopg2
     for prefix in (
         "postgresql+asyncpg://",
         "postgres+asyncpg://",
@@ -41,7 +45,12 @@ def get_url() -> str:
         "postgres://",
     ):
         if url.startswith(prefix):
-            return "postgresql+psycopg2://" + url[len(prefix) :]
+            url = "postgresql+psycopg2://" + url[len(prefix) :]
+            break
+    # Convertir ssl= de asyncpg → sslmode= de psycopg2
+    if "sslmode=" not in url:
+        url = url.replace("ssl=require", "sslmode=require")
+        url = url.replace("ssl=true", "sslmode=require")
     return url
 
 
