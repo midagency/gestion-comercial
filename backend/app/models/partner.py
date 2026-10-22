@@ -22,14 +22,16 @@ class Partner(Base):
         UUID(as_uuid=True), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True
     )
     partner_type: Mapped[str] = mapped_column(String(20), nullable=False)  # customer, supplier, both
-    name: Mapped[str] = mapped_column(String(250), nullable=False)
-    legal_name: Mapped[Optional[str]] = mapped_column(String(250))
+    name: Mapped[str] = mapped_column(String(250), nullable=False)  # nombre de fantasía
+    legal_name: Mapped[Optional[str]] = mapped_column(String(250))  # razón social
     tax_id: Mapped[Optional[str]] = mapped_column(String(50))
     email: Mapped[Optional[str]] = mapped_column(String(255))
     phone: Mapped[Optional[str]] = mapped_column(String(40))
     mobile: Mapped[Optional[str]] = mapped_column(String(40))
-    address: Mapped[Optional[str]] = mapped_column(Text)
+    address: Mapped[Optional[str]] = mapped_column(Text)  # domicilio fiscal
     city: Mapped[Optional[str]] = mapped_column(String(100))
+    province: Mapped[Optional[str]] = mapped_column(String(100))
+    postal_code: Mapped[Optional[str]] = mapped_column(String(20))
     country_code: Mapped[Optional[str]] = mapped_column(String(2))
     price_list_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True))
     payment_term_days: Mapped[int] = mapped_column(Integer, default=0)
