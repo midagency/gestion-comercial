@@ -42,6 +42,33 @@ class Settings(BaseSettings):
     # Solo desarrollo: create_all al arrancar. Producción: Alembic.
     AUTO_CREATE_SCHEMA: bool = True
 
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def sanitize_database_url(cls, v: str) -> str:
+        """Normaliza URLs de Neon para asyncpg.
+
+        - sslmode=require → ssl=require
+        - quita channel_binding (asyncpg no lo soporta)
+        """
+        if not isinstance(v, str) or not v.strip():
+            return v
+        url = v.strip()
+        # Esquema async
+        if url.startswith("postgres://"):
+            url = "postgresql+asyncpg://" + url[len("postgres://") :]
+        elif url.startswith("postgresql://") and "+asyncpg" not in url and "+psycopg" not in url:
+            url = "postgresql+asyncpg://" + url[len("postgresql://") :]
+        # Query params incompatibles con asyncpg
+        url = url.replace("sslmode=require", "ssl=require")
+        url = url.replace("sslmode=prefer", "ssl=prefer")
+        # channel_binding=require|disable → eliminar
+        import re
+
+        url = re.sub(r"[&?]channel_binding=[^&]*", "", url)
+        # limpiar ?& o trailing ?
+        url = url.replace("?&", "?").rstrip("?&")
+        return url
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def parse_cors(cls, v: Union[str, List[str]]) -> List[str]:
