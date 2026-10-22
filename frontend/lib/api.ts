@@ -589,3 +589,107 @@ export async function updateOpportunity(id: string, payload: unknown) {
   const { data } = await api.patch(`/crm/opportunities/${id}`, payload);
   return data;
 }
+export async function listActivities(params?: Record<string, unknown>) {
+  const { data } = await api.get("/crm/activities", { params });
+  return data;
+}
+export async function createActivity(payload: unknown) {
+  const { data } = await api.post("/crm/activities", payload);
+  return data;
+}
+export async function completeActivity(id: string) {
+  const { data } = await api.post(`/crm/activities/${id}/complete`);
+  return data;
+}
+export async function listLots(params?: Record<string, unknown>) {
+  const { data } = await api.get("/lots", { params });
+  return data;
+}
+export async function createLot(payload: unknown) {
+  const { data } = await api.post("/lots", payload);
+  return data;
+}
+export async function listSerials(params?: Record<string, unknown>) {
+  const { data } = await api.get("/serials", { params });
+  return data;
+}
+export async function createSerial(payload: unknown) {
+  const { data } = await api.post("/serials", payload);
+  return data;
+}
+export async function listBoms() {
+  const { data } = await api.get("/boms");
+  return data;
+}
+export async function createBom(payload: unknown) {
+  const { data } = await api.post("/boms", payload);
+  return data;
+}
+export async function listProductionOrders() {
+  const { data } = await api.get("/production-orders");
+  return data;
+}
+export async function createProductionOrder(payload: unknown) {
+  const { data } = await api.post("/production-orders", payload);
+  return data;
+}
+export async function completeProductionOrder(id: string) {
+  const { data } = await api.post(`/production-orders/${id}/complete`);
+  return data;
+}
+export async function listCommissionRules() {
+  const { data } = await api.get("/commissions/rules");
+  return data;
+}
+export async function createCommissionRule(payload: unknown) {
+  const { data } = await api.post("/commissions/rules", payload);
+  return data;
+}
+export async function listCommissionEntries(params?: Record<string, unknown>) {
+  const { data } = await api.get("/commissions/entries", { params });
+  return data;
+}
+export async function calculateCommissions(invoiceId: string) {
+  const { data } = await api.post(`/commissions/calculate/${invoiceId}`);
+  return data;
+}
+export async function listCurrencyRates() {
+  const { data } = await api.get("/currency/rates");
+  return data;
+}
+export async function createCurrencyRate(payload: unknown) {
+  const { data } = await api.post("/currency/rates", payload);
+  return data;
+}
+export async function convertCurrency(params: Record<string, unknown>) {
+  const { data } = await api.get("/currency/convert", { params });
+  return data;
+}
+export async function listWorkOrders(params?: Record<string, unknown>) {
+  const { data } = await api.get("/work-orders", { params });
+  return data;
+}
+export async function createWorkOrder(payload: unknown) {
+  const { data } = await api.post("/work-orders", payload);
+  return data;
+}
+export async function updateWorkOrder(id: string, payload: unknown) {
+  const { data } = await api.patch(`/work-orders/${id}`, payload);
+  return data;
+}
+export async function listPaymentProviders() {
+  const { data } = await api.get("/payment-providers");
+  return data;
+}
+export async function upsertPaymentProvider(payload: unknown) {
+  const { data } = await api.post("/payment-providers", payload);
+  return data;
+}
+export async function createAttachment(payload: unknown) {
+  const { data } = await api.post("/attachments", payload);
+  return data;
+}
+export async function listAttachments(entity_type: string, entity_id: string) {
+  const { data } = await api.get("/attachments", { params: { entity_type, entity_id } });
+  return data;
+}
