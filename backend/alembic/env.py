@@ -47,10 +47,14 @@ def get_url() -> str:
         if url.startswith(prefix):
             url = "postgresql+psycopg2://" + url[len(prefix) :]
             break
-    # Convertir ssl= de asyncpg → sslmode= de psycopg2
+    # asyncpg: ssl= / channel_binding=  →  psycopg2: sslmode=
+    import re
+
+    url = re.sub(r"[&?]channel_binding=[^&]*", "", url)
     if "sslmode=" not in url:
         url = url.replace("ssl=require", "sslmode=require")
         url = url.replace("ssl=true", "sslmode=require")
+    url = url.replace("?&", "?").rstrip("?&")
     return url
 
 
