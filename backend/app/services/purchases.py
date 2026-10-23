@@ -90,8 +90,8 @@ async def _validate_product(db: AsyncSession, company_id: UUID, product_id: UUID
 
 
 def _line_out(line: PurchaseOrderLine) -> dict:
-    qty = float(line.quantity)
-    recv = float(line.qty_received)
+    qty = float(line.quantity or 0)
+    recv = float(line.qty_received or 0)
     return {
         "id": line.id,
         "product_id": line.product_id,
@@ -99,11 +99,11 @@ def _line_out(line: PurchaseOrderLine) -> dict:
         "description": line.description,
         "quantity": qty,
         "qty_received": recv,
-        "qty_pending": max(0, qty - recv),
-        "unit_price": float(line.unit_price),
-        "discount_pct": float(line.discount_pct),
-        "tax_rate": float(line.tax_rate),
-        "subtotal": float(line.subtotal),
+        "qty_pending": max(0.0, qty - recv),
+        "unit_price": float(line.unit_price or 0),
+        "discount_pct": float(line.discount_pct or 0),
+        "tax_rate": float(line.tax_rate or 0),
+        "subtotal": float(line.subtotal or 0),
     }
 
 

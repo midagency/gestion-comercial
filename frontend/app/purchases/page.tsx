@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/Button";
@@ -145,6 +145,15 @@ export default function PurchasesPage() {
   }, [suppliers]);
 
   const warehouseList = warehouses || [];
+  // Un solo almacén por defecto: el principal (o el primero)
+  const mainWarehouseId = (() => {
+    const main = warehouseList.find((w: Record<string, unknown>) => w.is_main);
+    return String((main || warehouseList[0])?.id || "");
+  })();
+
+  useEffect(() => {
+    if (!warehouseId && mainWarehouseId) setWarehouseId(mainWarehouseId);
+  }, [mainWarehouseId, warehouseId]);
 
   const createMut = useMutation({
     mutationFn: createPurchaseOrder,
@@ -852,13 +861,10 @@ export default function PurchasesPage() {
             label="Almacén de recepción"
             value={warehouseId}
             onChange={(e) => setWarehouseId(e.target.value)}
-            options={[
-              { value: "", label: "Principal / default" },
-              ...warehouseList.map((w: Record<string, unknown>) => ({
-                value: String(w.id),
-                label: String(w.name) + (w.is_main ? " (principal)" : ""),
-              })),
-            ]}
+            options={warehouseList.map((w: Record<string, unknown>) => ({
+              value: String(w.id),
+              label: String(w.name) + (w.is_main ? " (principal)" : ""),
+            }))}
           />
           <Input
             label="Notas"
@@ -1017,9 +1023,7 @@ export default function PurchasesPage() {
               label="Almacén destino"
               value={receiveWarehouseId}
               onChange={(e) => setReceiveWarehouseId(e.target.value)}
-              options={[
-                { value: "", label: "Default de la OC" },
-                ...warehouseList.map((w: Record<string, unknown>) => ({
+              options={[...warehouseList.map((w: Record<string, unknown>) => ({
                   value: String(w.id),
                   label: String(w.name) + (w.is_main ? " (principal)" : ""),
                 })),

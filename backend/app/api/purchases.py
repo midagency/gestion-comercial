@@ -129,10 +129,13 @@ async def confirm_purchase_order(
     if not order:
         raise HTTPException(status_code=404, detail="Orden de compra no encontrada")
     try:
-        order = await purchases_service.confirm_order(db, order)
+        await purchases_service.confirm_order(db, order)
+        order = await purchases_service.get_order(db, current_user.company_id, order_id)
+        return PurchaseOrderOut(**_order_out(order))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    return PurchaseOrderOut(**_order_out(order))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al confirmar OC: {e}")
 
 
 @router.post(

@@ -25,16 +25,16 @@ class PurchaseOrderLineCreate(BaseModel):
 
 class PurchaseOrderLineOut(BaseModel):
     id: UUID
-    product_id: UUID
-    variant_id: Optional[UUID]
-    description: Optional[str]
-    quantity: float
-    qty_received: float
-    qty_pending: float  # quantity - qty_received
-    unit_price: float
-    discount_pct: float
-    tax_rate: float
-    subtotal: float
+    product_id: Optional[UUID] = None
+    variant_id: Optional[UUID] = None
+    description: Optional[str] = None
+    quantity: float = 0
+    qty_received: float = 0
+    qty_pending: float = 0
+    unit_price: float = 0
+    discount_pct: float = 0
+    tax_rate: float = 0
+    subtotal: float = 0
 
     model_config = {"from_attributes": True}
 
