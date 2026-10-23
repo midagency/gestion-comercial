@@ -78,21 +78,18 @@ class Invoice(Base):
         UUID(as_uuid=True), ForeignKey("partners.id"), nullable=False
     )
     sale_order_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("sale_orders.id"))
-    # Factura origen (para notas de crédito / débito)
     related_invoice_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("invoices.id", ondelete="SET NULL")
     )
     invoice_number: Mapped[str] = mapped_column(String(40), nullable=False)
     invoice_type: Mapped[str] = mapped_column(String(20), default="invoice")  # invoice, credit_note, debit_note
     status: Mapped[str] = mapped_column(String(30), default="draft")
-    # Motivo de NC: return | discount | error | other
     credit_reason: Mapped[Optional[str]] = mapped_column(String(40))
-    # Facturación electrónica (AFIP / equivalente)
     cae: Mapped[Optional[str]] = mapped_column(String(20))
     cae_due_date: Mapped[Optional[date]] = mapped_column(Date)
-    fiscal_status: Mapped[Optional[str]] = mapped_column(String(30))  # pending | authorized | rejected | simulated
+    fiscal_status: Mapped[Optional[str]] = mapped_column(String(30))
     fiscal_point_of_sale: Mapped[Optional[str]] = mapped_column(String(10))
-    fiscal_voucher_type: Mapped[Optional[str]] = mapped_column(String(10))  # 1=A, 6=B, 11=C, etc.
+    fiscal_voucher_type: Mapped[Optional[str]] = mapped_column(String(10))
 
     invoice_date: Mapped[date] = mapped_column(Date, default=date.today)
     due_date: Mapped[Optional[date]] = mapped_column(Date)
@@ -127,6 +124,8 @@ class InvoiceLine(Base):
 
 
 class Payment(Base):
+    """Recibo de cobro (cliente). Actualiza cuenta corriente y, según medio, banco/caja/cheque."""
+
     __tablename__ = "payments"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -139,8 +138,14 @@ class Payment(Base):
     invoice_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("invoices.id"))
     amount: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False)
     payment_date: Mapped[date] = mapped_column(Date, default=date.today)
+    # cash | transfer | check | card | other
     payment_method: Mapped[Optional[str]] = mapped_column(String(40))
     reference: Mapped[Optional[str]] = mapped_column(String(100))
     notes: Mapped[Optional[str]] = mapped_column(Text)
+    bank_account_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("bank_accounts.id")
+    )
+    check_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("checks.id"))
+    receipt_number: Mapped[Optional[str]] = mapped_column(String(40))
     created_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
