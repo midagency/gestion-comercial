@@ -86,8 +86,10 @@ export default function OnboardingPage() {
     phone: "",
   });
   const [hasMultiple, setHasMultiple] = useState(false);
-  const [modules, setModules] = useState<ModuleRec[]>([]);
-  const [enabledModules, setEnabledModules] = useState<string[]>([]);
+  const [modules, setModules] = useState<ModuleRec[]>(FALLBACK_MODULES);
+  const [enabledModules, setEnabledModules] = useState<string[]>(() =>
+    FALLBACK_MODULES.filter((r) => r.recommended).map((r) => r.key)
+  );
   const [priceLists, setPriceLists] = useState<{ name: string; currency_code: string; is_default: boolean }[]>([]);
   const [taxRates, setTaxRates] = useState([{ name: "IVA 21%", rate: 21, is_default: true }]);
   const [user, setUserForm] = useState({
@@ -98,30 +100,37 @@ export default function OnboardingPage() {
     phone: "",
   });
 
+  // Módulos y listas al instante (sin esperar al cold start de la API)
   useEffect(() => {
-    if (step === 4 && businessType) {
+    if (step === 4) {
+      setModules(FALLBACK_MODULES);
+      setEnabledModules(
+        FALLBACK_MODULES.filter((r) => r.recommended).map((r) => r.key)
+      );
+      // Opcional: enriquecer desde API con timeout corto (no bloquea la UI)
+      const ac = new AbortController();
+      const timer = setTimeout(() => ac.abort(), 4000);
       getModuleRecommendations(businessType)
         .then((recs: ModuleRec[]) => {
-          const list = Array.isArray(recs) && recs.length > 0 ? recs : FALLBACK_MODULES;
-          setModules(list);
-          setEnabledModules(list.filter((r) => r.recommended).map((r) => r.key));
+          if (Array.isArray(recs) && recs.length > 0) {
+            setModules(recs);
+            setEnabledModules(recs.filter((r) => r.recommended).map((r) => r.key));
+          }
         })
-        .catch(() => {
-          setModules(FALLBACK_MODULES);
-          setEnabledModules(
-            FALLBACK_MODULES.filter((r) => r.recommended).map((r) => r.key)
-          );
-        });
+        .catch(() => {})
+        .finally(() => clearTimeout(timer));
+      return () => {
+        clearTimeout(timer);
+        ac.abort();
+      };
     }
-    if (step === 5 && businessType) {
+    if (step === 5) {
+      setPriceLists([{ name: "General", currency_code: "ARS", is_default: true }]);
       getDefaultPriceLists(businessType)
         .then((lists) => {
           if (Array.isArray(lists) && lists.length > 0) setPriceLists(lists);
-          else setPriceLists([{ name: "General", currency_code: "ARS", is_default: true }]);
         })
-        .catch(() =>
-          setPriceLists([{ name: "General", currency_code: "ARS", is_default: true }])
-        );
+        .catch(() => {});
     }
   }, [step, businessType]);
 
