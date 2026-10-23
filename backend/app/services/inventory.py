@@ -31,6 +31,8 @@ async def _get_or_create_stock_level(
     product_id: UUID,
     variant_id: Optional[UUID],
 ) -> StockLevel:
+    from sqlalchemy.exc import IntegrityError
+
     q = select(StockLevel).where(
         StockLevel.company_id == company_id,
         StockLevel.warehouse_id == warehouse_id,
@@ -56,8 +58,13 @@ async def _get_or_create_stock_level(
         min_qty=0,
     )
     db.add(level)
-    await db.flush()
-    return level
+    try:
+        await db.flush()
+        return level
+    except IntegrityError as e:
+        raise ValueError(
+            f"Conflicto al crear stock (warehouse/product). Reintentá. Detalle: {e.orig if hasattr(e, 'orig') else e}"
+        ) from e
 
 
 async def _apply_quantity_change(

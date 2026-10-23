@@ -76,6 +76,36 @@ async def lifespan(app: FastAPI):
             await conn.execute(text(
                 "ALTER TABLE partners ADD COLUMN IF NOT EXISTS postal_code VARCHAR(20)"
             ))
+            # Tablas de stock por si create_all no las creó
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS stock_levels (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+                    warehouse_id UUID NOT NULL REFERENCES warehouses(id) ON DELETE CASCADE,
+                    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+                    variant_id UUID,
+                    quantity NUMERIC(14,3) DEFAULT 0,
+                    reserved_qty NUMERIC(14,3) DEFAULT 0,
+                    min_qty NUMERIC(14,3) DEFAULT 0,
+                    max_qty NUMERIC(14,3)
+                )
+            """))
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS stock_moves (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+                    warehouse_id UUID NOT NULL REFERENCES warehouses(id) ON DELETE CASCADE,
+                    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+                    variant_id UUID,
+                    move_type VARCHAR(30) NOT NULL,
+                    quantity NUMERIC(14,3) NOT NULL,
+                    reference_type VARCHAR(40),
+                    reference_id UUID,
+                    notes TEXT,
+                    created_by UUID,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """))
     except Exception as e:
         print(f"[lifespan] ensure columns skipped: {e}")
     yield

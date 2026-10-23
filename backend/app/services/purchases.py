@@ -396,48 +396,62 @@ async def receive_goods(
         if not wh_check.scalar_one_or_none():
             raise ValueError("Almacén no encontrado o inactivo")
 
-    lines_by_id = {ln.id: ln for ln in order.lines}
+    lines_by_id = {ln.id: ln for ln in (order.lines or [])}
+    if not data.lines:
+        raise ValueError("No se indicaron líneas a recibir")
 
     for receipt in data.lines:
         line = lines_by_id.get(receipt.line_id)
         if not line:
             raise ValueError(f"Línea {receipt.line_id} no pertenece a esta orden")
 
-        pending = float(line.quantity) - float(line.qty_received)
-        if receipt.quantity > pending + 1e-9:
+        qty = float(receipt.quantity or 0)
+        if qty <= 0:
+            continue
+
+        pending = float(line.quantity or 0) - float(line.qty_received or 0)
+        if qty > pending + 1e-9:
             raise ValueError(
-                f"Cantidad a recibir ({receipt.quantity}) supera lo pendiente ({pending}) "
+                f"Cantidad a recibir ({qty}) supera lo pendiente ({pending}) "
                 f"en la línea {receipt.line_id}"
             )
 
+        if not line.product_id:
+            raise ValueError(f"La línea {receipt.line_id} no tiene producto asociado")
+
         product = await _validate_product(db, company_id, line.product_id)
+        line.qty_received = float(line.qty_received or 0) + qty
 
-        line.qty_received = float(line.qty_received) + receipt.quantity
+        # Actualizar stock solo si el producto controla stock
+        track = bool(getattr(product, "track_stock", True))
+        if track:
+            try:
+                level = await _get_or_create_stock_level(
+                    db, company_id, warehouse_id, line.product_id, line.variant_id
+                )
+                await _apply_quantity_change(db, level, qty, allow_negative=True)
+            except Exception as e:
+                raise ValueError(f"Error al actualizar stock: {e}") from e
 
-        if product.track_stock:
-            level = await _get_or_create_stock_level(
-                db, company_id, warehouse_id, line.product_id, line.variant_id
-            )
-            await _apply_quantity_change(db, level, receipt.quantity)
             move = StockMove(
                 company_id=company_id,
                 warehouse_id=warehouse_id,
                 product_id=line.product_id,
                 variant_id=line.variant_id,
                 move_type="in",
-                quantity=receipt.quantity,
+                quantity=qty,
                 reference_type="purchase_order",
                 reference_id=order.id,
-                notes=data.notes or f"Recepción OC {order.order_number}",
+                notes=(data.notes or f"Recepción OC {order.order_number}")[:500],
                 created_by=user_id,
             )
             db.add(move)
 
-    # Actualizar estado de la orden
     all_received = all(
-        float(ln.qty_received) >= float(ln.quantity) - 1e-9 for ln in order.lines
+        float(ln.qty_received or 0) >= float(ln.quantity or 0) - 1e-9
+        for ln in order.lines
     )
-    any_received = any(float(ln.qty_received) > 0 for ln in order.lines)
+    any_received = any(float(ln.qty_received or 0) > 0 for ln in order.lines)
 
     if all_received:
         order.status = "received"

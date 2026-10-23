@@ -175,12 +175,15 @@ async def receive_goods(
     if not order:
         raise HTTPException(status_code=404, detail="Orden de compra no encontrada")
     try:
-        order = await purchases_service.receive_goods(
+        await purchases_service.receive_goods(
             db, current_user.company_id, current_user.id, order, data
         )
+        order = await purchases_service.get_order(db, current_user.company_id, order_id)
+        return PurchaseOrderOut(**_order_out(order))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    return PurchaseOrderOut(**_order_out(order))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al recibir mercadería: {e}")
 
 
 @router.post(
