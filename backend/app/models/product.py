@@ -37,8 +37,12 @@ class Product(Base):
     category_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("product_categories.id", ondelete="SET NULL")
     )
+    subcategory_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("product_categories.id", ondelete="SET NULL")
+    )
+    brand: Mapped[Optional[str]] = mapped_column(String(120))
     sku: Mapped[Optional[str]] = mapped_column(String(80))
-    barcode: Mapped[Optional[str]] = mapped_column(String(80))
+    barcode: Mapped[Optional[str]] = mapped_column(String(80))  # EAN / código de barras
     name: Mapped[str] = mapped_column(String(250), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text)
     product_type: Mapped[str] = mapped_column(String(20), default="product")  # product, service, kit
@@ -85,6 +89,9 @@ class PriceList(Base):
     )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     currency_code: Mapped[str] = mapped_column(String(3), default="ARS")
+    # Descuento global de la lista (sobre precio base / lista default)
+    discount_percent: Mapped[Optional[float]] = mapped_column(Numeric(8, 4), default=0)
+    discount_amount: Mapped[Optional[float]] = mapped_column(Numeric(14, 2), default=0)
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

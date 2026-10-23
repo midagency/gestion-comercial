@@ -325,7 +325,7 @@ async def pay_supplier_invoice(
 ):
     try:
         inv = await purchases_service.pay_supplier_invoice(
-            db, current_user.company_id, data
+            db, current_user.company_id, data, user_id=current_user.id
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -640,13 +640,84 @@ async def cancel_supplier_invoice(db: AsyncSession, invoice: SupplierInvoice) ->
 
 
 async def pay_supplier_invoice(
-    db: AsyncSession, company_id: UUID, data: SupplierPaymentCreate
+    db: AsyncSession, company_id: UUID, data: SupplierPaymentCreate, user_id: UUID | None = None
 ) -> SupplierInvoice:
+    """
+    Orden de pago a proveedor.
+    - Actualiza cuenta corriente (amount_paid).
+    - transfer → egreso en cuenta bancaria.
+    - check → crea cheque (propio o de terceros).
+    """
     inv = await get_supplier_invoice(db, company_id, data.invoice_id)
     if not inv:
         raise ValueError("Factura de proveedor no encontrada")
     if inv.status == "cancelled":
         raise ValueError("No se puede pagar una factura cancelada")
+
+    method = (data.payment_method or "cash").lower().strip()
+    if method in ("transfer", "transferencia", "bank"):
+        method = "transfer"
+        if not data.bank_account_id:
+            raise ValueError("Indicá la cuenta bancaria para pago por transferencia")
+    if method in ("check", "cheque"):
+        method = "check"
+        if not data.check_number:
+            raise ValueError("Indicá el número de cheque")
+        if not data.check_kind:
+            data.check_kind = "own"
+
+    if method == "transfer" and data.bank_account_id:
+        from app.models.treasury import BankAccount, BankTransaction
+
+        ba = (
+            await db.execute(
+                select(BankAccount).where(
+                    BankAccount.id == data.bank_account_id,
+                    BankAccount.company_id == company_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if not ba:
+            raise ValueError("Cuenta bancaria no encontrada")
+        if float(ba.current_balance or 0) < float(data.amount):
+            raise ValueError(
+                f"Saldo insuficiente en la cuenta ({ba.current_balance}). "
+                f"Se intentó debitar {data.amount}"
+            )
+        ba.current_balance = float(ba.current_balance or 0) - float(data.amount)
+        db.add(
+            BankTransaction(
+                company_id=company_id,
+                account_id=ba.id,
+                transaction_type="withdrawal",
+                direction="expense",
+                amount=data.amount,
+                transaction_date=data.payment_date or date.today(),
+                description=f"Orden de pago factura {inv.invoice_number}",
+                reference=data.reference,
+                reference_type="supplier_payment",
+                reference_id=inv.id,
+                created_by=user_id,
+            )
+        )
+
+    if method == "check":
+        from app.models.accounting import Check
+
+        chk = Check(
+            company_id=company_id,
+            check_kind=data.check_kind or "own",
+            bank_name=data.check_bank_name,
+            check_number=data.check_number,
+            amount=data.amount,
+            due_date=data.check_due_date,
+            partner_id=inv.partner_id,
+            bank_account_id=data.bank_account_id,
+            status="pending" if (data.check_kind or "own") == "third_party" else "delivered",
+            notes=f"OP factura {inv.invoice_number}",
+            created_by=user_id,
+        )
+        db.add(chk)
 
     inv.amount_paid = float(inv.amount_paid) + data.amount
     if float(inv.amount_paid) >= float(inv.total):

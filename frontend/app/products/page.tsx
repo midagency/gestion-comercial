@@ -23,6 +23,8 @@ import { Plus, Search, Pencil, Trash2, Package } from "lucide-react";
 interface ProductForm {
   name: string;
   sku: string;
+  barcode: string;
+  brand: string;
   product_type: string;
   track_stock: boolean;
   unit: string;
@@ -32,6 +34,8 @@ interface ProductForm {
 const emptyForm: ProductForm = {
   name: "",
   sku: "",
+  barcode: "",
+  brand: "",
   product_type: "product",
   track_stock: true,
   unit: "unit",
@@ -105,6 +109,8 @@ export default function ProductsPage() {
     setForm({
       name: String(p.name || ""),
       sku: String(p.sku || ""),
+      barcode: String(p.barcode || ""),
+      brand: String(p.brand || ""),
       product_type: String(p.product_type || "product"),
       track_stock: Boolean(p.track_stock),
       unit: String(p.unit || "unit"),
@@ -273,6 +279,17 @@ export default function ProductsPage() {
             value={form.sku}
             onChange={(e) => setForm({ ...form, sku: e.target.value })}
             hint="Código interno único"
+          />
+          <Input
+            label="Código EAN"
+            value={form.barcode}
+            onChange={(e) => setForm({ ...form, barcode: e.target.value })}
+            hint="Código de barras"
+          />
+          <Input
+            label="Marca"
+            value={form.brand}
+            onChange={(e) => setForm({ ...form, brand: e.target.value })}
           />
           <Select
             label="Tipo"

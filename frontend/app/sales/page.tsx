@@ -24,9 +24,15 @@ import {
   listProducts,
   listInvoices,
   createPayment,
+  listBankAccounts,
   openPrintDocument,
   createCreditNote,
   listCreditNotes,
+  listDebitNotes,
+  createDebitNote,
+  listPayments,
+  listDeliveryNotes,
+  createDeliveryNoteFromOrder,
   listWarehouses,
 } from "@/lib/api";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -44,6 +50,7 @@ import {
   Printer,
   RotateCcw,
   Search,
+  Truck,
 } from "lucide-react";
 import type { BadgeVariant } from "@/components/ui/Badge";
 
@@ -76,7 +83,7 @@ export default function SalesPage() {
   const qc = useQueryClient();
   const { success, error: toastError } = useToast();
 
-  const [tab, setTab] = useState<"orders" | "invoices" | "credit-notes">("orders");
+  const [tab, setTab] = useState<"orders" | "invoices" | "credit-notes" | "debit-notes" | "receipts" | "remitos">("orders");
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [invoiceStatusFilter, setInvoiceStatusFilter] = useState("");
@@ -91,8 +98,13 @@ export default function SalesPage() {
   const [payAmount, setPayAmount] = useState("");
   const [payMethod, setPayMethod] = useState("cash");
   const [payReference, setPayReference] = useState("");
+  const [payBankAccount, setPayBankAccount] = useState("");
+  const [payCheckNumber, setPayCheckNumber] = useState("");
+  const [payCheckBank, setPayCheckBank] = useState("");
+  const [payCheckDue, setPayCheckDue] = useState("");
 
   // Credit note
+  const [ndInvoice, setNdInvoice] = useState<Record<string, unknown> | null>(null);
   const [ncInvoice, setNcInvoice] = useState<Record<string, unknown> | null>(null);
   const [ncReason, setNcReason] = useState("return");
   const [ncNotes, setNcNotes] = useState("");
@@ -131,6 +143,24 @@ export default function SalesPage() {
     queryKey: ["credit-notes"],
     queryFn: () => listCreditNotes({ page_size: 50 }),
     enabled: tab === "credit-notes",
+  });
+
+  const { data: debitNotes, isLoading: ndLoading } = useQuery({
+    queryKey: ["debit-notes"],
+    queryFn: () => listDebitNotes({ page_size: 50 }),
+    enabled: tab === "debit-notes",
+  });
+
+  const { data: receipts, isLoading: recLoading } = useQuery({
+    queryKey: ["payments"],
+    queryFn: () => listPayments({ page_size: 50 }),
+    enabled: tab === "receipts",
+  });
+
+  const { data: remitos, isLoading: remLoading } = useQuery({
+    queryKey: ["delivery-notes"],
+    queryFn: () => listDeliveryNotes({ page_size: 50 }),
+    enabled: tab === "remitos",
   });
 
   const { data: warehouses } = useQuery({
@@ -175,7 +205,13 @@ export default function SalesPage() {
     },
   });
 
-  const actionMut = useMutation({
+  
+  const { data: bankAccounts } = useQuery({
+    queryKey: ["bank-accounts"],
+    queryFn: () => listBankAccounts(),
+  });
+
+const actionMut = useMutation({
     mutationFn: async ({
       action,
       id,
@@ -228,6 +264,23 @@ export default function SalesPage() {
     mutationFn: createCreditNote,
     onSuccess: (data: Record<string, unknown>) => {
       qc.invalidateQueries({ queryKey: ["credit-notes"] });
+
+  const ndMut = useMutation({
+    mutationFn: createDebitNote,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["debit-notes"] });
+      qc.invalidateQueries({ queryKey: ["invoices"] });
+      success("Nota de débito emitida");
+      setNdInvoice(null);
+    },
+    onError: (e: unknown) => {
+      const msg =
+        (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+        "Error al emitir ND";
+      toastError("Error", String(msg));
+    },
+  });
+
       qc.invalidateQueries({ queryKey: ["invoices"] });
       qc.invalidateQueries({ queryKey: ["stock-levels"] });
       success("Nota de crédito emitida", String(data.invoice_number || ""));
@@ -353,6 +406,10 @@ export default function SalesPage() {
         amount,
         payment_method: payMethod,
         reference: payReference || undefined,
+        bank_account_id: payMethod === "transfer" ? payBankAccount || undefined : undefined,
+        check_number: payMethod === "check" ? payCheckNumber || undefined : undefined,
+        check_bank_name: payMethod === "check" ? payCheckBank || undefined : undefined,
+        check_due_date: payMethod === "check" && payCheckDue ? payCheckDue : undefined,
       },
     });
   }
@@ -400,6 +457,9 @@ export default function SalesPage() {
             { id: "orders" as const, label: "Pedidos / Cotizaciones" },
             { id: "invoices" as const, label: "Facturas" },
             { id: "credit-notes" as const, label: "Notas de crédito" },
+            { id: "debit-notes" as const, label: "Notas de débito" },
+            { id: "receipts" as const, label: "Recibos" },
+            { id: "remitos" as const, label: "Remitos" },
           ] as const
         ).map((t) => (
           <button
@@ -443,7 +503,7 @@ export default function SalesPage() {
               { value: "draft", label: "Borrador" },
               { value: "confirmed", label: "Confirmados" },
               { value: "done", label: "Cerrados" },
-              { value: "cancelled", label: "Cancelados" },
+              /* cancelados ocultos */
             ].map((f) => (
               <button
                 key={f.value}
@@ -488,7 +548,7 @@ export default function SalesPage() {
               { value: "posted", label: "Contabilizadas" },
               { value: "partial", label: "Pago parcial" },
               { value: "paid", label: "Pagadas" },
-              { value: "cancelled", label: "Canceladas" },
+              /* canceladas ocultas */
             ].map((f) => (
               <button
                 key={f.value}
@@ -674,6 +734,23 @@ export default function SalesPage() {
                             >
                               <FileText className="h-4 w-4" /> Facturar
                             </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => {
+                            createDeliveryNoteFromOrder(String(o.id), {})
+                              .then(() => {
+                                qc.invalidateQueries({ queryKey: ["delivery-notes"] });
+                                success("Remito generado");
+                              })
+                              .catch((e: unknown) => {
+                                const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || "Error";
+                                toastError("Error", String(msg));
+                              });
+                          }}
+                        >
+                          Remito
+                        </Button>
                             <Button
                               size="sm"
                               variant="secondary"
@@ -809,6 +886,8 @@ export default function SalesPage() {
                                 >
                                   <CreditCard className="h-3.5 w-3.5" /> Cobrar
                                 </Button>
+                                <Button size="sm" variant="secondary" onClick={() => setNdInvoice(inv)} title="Nota de débito">ND</Button>
+                                <Button size="sm" variant="secondary" onClick={() => setNcInvoice(inv)} title="Nota de crédito">NC</Button>
                               )}
                             </div>
                           </td>
@@ -907,6 +986,108 @@ export default function SalesPage() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          )}
+        </div>
+      )}
+
+
+      {tab === "debit-notes" && (
+        <div className="mt-6">
+          {ndLoading && <PageLoader />}
+          {!ndLoading && (debitNotes?.items || []).length === 0 && (
+            <EmptyState icon={FileText} title="Sin notas de débito" description="Emití una ND desde una factura." />
+          )}
+          {!ndLoading && (debitNotes?.items || []).length > 0 && (
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-left text-xs font-medium uppercase text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3">Número</th>
+                    <th className="px-4 py-3">Cliente</th>
+                    <th className="px-4 py-3">Fecha</th>
+                    <th className="px-4 py-3 text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {(debitNotes?.items || []).map((nd: Record<string, unknown>) => (
+                    <tr key={String(nd.id)}>
+                      <td className="px-4 py-3 font-mono font-semibold">{String(nd.invoice_number)}</td>
+                      <td className="px-4 py-3">{partnerMap[String(nd.partner_id)] || "—"}</td>
+                      <td className="px-4 py-3">{formatDate(String(nd.invoice_date))}</td>
+                      <td className="px-4 py-3 text-right font-semibold">{formatCurrency(Number(nd.total))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "receipts" && (
+        <div className="mt-6">
+          {recLoading && <PageLoader />}
+          {!recLoading && (receipts?.items || []).length === 0 && (
+            <EmptyState icon={CreditCard} title="Sin recibos" description="Se generan al cobrar una factura." />
+          )}
+          {!recLoading && (receipts?.items || []).length > 0 && (
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-left text-xs font-medium uppercase text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3">Recibo</th>
+                    <th className="px-4 py-3">Cliente</th>
+                    <th className="px-4 py-3">Fecha</th>
+                    <th className="px-4 py-3">Medio</th>
+                    <th className="px-4 py-3 text-right">Monto</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {(receipts?.items || []).map((r: Record<string, unknown>) => (
+                    <tr key={String(r.id)}>
+                      <td className="px-4 py-3 font-mono font-semibold">{String(r.receipt_number || "—")}</td>
+                      <td className="px-4 py-3">{partnerMap[String(r.partner_id)] || "—"}</td>
+                      <td className="px-4 py-3">{formatDate(String(r.payment_date))}</td>
+                      <td className="px-4 py-3 capitalize">{String(r.payment_method || "—")}</td>
+                      <td className="px-4 py-3 text-right font-semibold">{formatCurrency(Number(r.amount))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "remitos" && (
+        <div className="mt-6">
+          {remLoading && <PageLoader />}
+          {!remLoading && (remitos?.items || []).length === 0 && (
+            <EmptyState icon={Truck} title="Sin remitos" description="Generá un remito desde un pedido confirmado." />
+          )}
+          {!remLoading && (remitos?.items || []).length > 0 && (
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-left text-xs font-medium uppercase text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3">Número</th>
+                    <th className="px-4 py-3">Cliente</th>
+                    <th className="px-4 py-3">Fecha</th>
+                    <th className="px-4 py-3">Estado</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {(remitos?.items || []).map((n: Record<string, unknown>) => (
+                    <tr key={String(n.id)}>
+                      <td className="px-4 py-3 font-mono font-semibold">{String(n.note_number || "—")}</td>
+                      <td className="px-4 py-3">{partnerMap[String(n.partner_id)] || "—"}</td>
+                      <td className="px-4 py-3">{formatDate(String(n.note_date || n.created_at))}</td>
+                      <td className="px-4 py-3 capitalize">{String(n.status || "—")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
@@ -1134,17 +1315,51 @@ export default function SalesPage() {
             onChange={(e) => setPayMethod(e.target.value)}
             options={[
               { value: "cash", label: "Efectivo" },
-              { value: "transfer", label: "Transferencia" },
+              { value: "transfer", label: "Transferencia bancaria" },
               { value: "card", label: "Tarjeta" },
-              { value: "check", label: "Cheque" },
+              { value: "check", label: "Cheque de terceros" },
               { value: "other", label: "Otro" },
             ]}
           />
+          {payMethod === "transfer" && (
+            <Select
+              label="Cuenta bancaria *"
+              value={payBankAccount}
+              onChange={(e) => setPayBankAccount(e.target.value)}
+              options={(Array.isArray(bankAccounts) ? bankAccounts : bankAccounts?.items || []).map(
+                (a: Record<string, unknown>) => ({
+                  value: String(a.id),
+                  label: `${a.name}${a.bank_name ? ` (${a.bank_name})` : ""}`,
+                })
+              )}
+              placeholder="Seleccionar cuenta"
+            />
+          )}
+          {payMethod === "check" && (
+            <>
+              <Input
+                label="N° de cheque *"
+                value={payCheckNumber}
+                onChange={(e) => setPayCheckNumber(e.target.value)}
+              />
+              <Input
+                label="Banco del cheque"
+                value={payCheckBank}
+                onChange={(e) => setPayCheckBank(e.target.value)}
+              />
+              <Input
+                label="Fecha de vencimiento"
+                type="date"
+                value={payCheckDue}
+                onChange={(e) => setPayCheckDue(e.target.value)}
+              />
+            </>
+          )}
           <Input
-            label="Referencia"
+            label="Referencia / detalle"
             value={payReference}
             onChange={(e) => setPayReference(e.target.value)}
-            placeholder="N° de operación, cheque..."
+            placeholder="N° de operación, CBU, observaciones..."
           />
           <div className="flex justify-end gap-2 pt-2">
             <Button
@@ -1155,12 +1370,43 @@ export default function SalesPage() {
               Cancelar
             </Button>
             <Button loading={actionMut.isPending} onClick={submitPay}>
-              <CreditCard className="h-4 w-4" /> Registrar cobro
+              <CreditCard className="h-4 w-4" /> Emitir recibo
             </Button>
           </div>
         </div>
       </Modal>
 
+
+      
+      <Modal
+        open={!!ndInvoice}
+        onClose={() => setNdInvoice(null)}
+        title="Emitir nota de débito"
+        description={
+          ndInvoice
+            ? `Sobre factura ${String(ndInvoice.invoice_number)} · ${formatCurrency(Number(ndInvoice.total))}`
+            : undefined
+        }
+        size="sm"
+      >
+        <div className="grid gap-4">
+          <p className="text-sm text-slate-600">
+            La ND aumenta el saldo a cobrar del cliente (cuenta corriente).
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setNdInvoice(null)}>Cancelar</Button>
+            <Button
+              loading={ndMut?.isPending}
+              onClick={() => {
+                if (!ndInvoice) return;
+                ndMut.mutate({ related_invoice_id: ndInvoice.id, reason: "other" });
+              }}
+            >
+              Emitir ND
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Modal: nota de crédito */}
       <Modal

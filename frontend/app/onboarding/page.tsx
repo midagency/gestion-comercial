@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
 import {
   completeOnboarding,
   getModuleRecommendations,
@@ -68,8 +69,12 @@ export default function OnboardingPage() {
     tax_id: "",
     country_code: "AR",
     currency_code: "ARS",
-    address: "",
+    province: "",
     city: "",
+    postal_code: "",
+    address: "",
+    email: "",
+    phone: "",
   });
   const [hasMultiple, setHasMultiple] = useState(false);
   const [modules, setModules] = useState<ModuleRec[]>([]);
@@ -224,7 +229,7 @@ export default function OnboardingPage() {
           {step === 2 && (
             <div>
               <h2 className="text-xl font-bold text-slate-900">Datos de tu empresa</h2>
-              <p className="mt-1 text-sm text-slate-500">Nombre comercial, CUIT y moneda.</p>
+              <p className="mt-1 text-sm text-slate-500">Datos fiscales y de contacto.</p>
               <div className="mt-6 space-y-4">
                 <Input
                   label="Nombre comercial *"
@@ -244,10 +249,19 @@ export default function OnboardingPage() {
                   onChange={(e) => setCompany({ ...company, tax_id: e.target.value })}
                 />
                 <div className="grid grid-cols-2 gap-4">
-                  <Input
-                    label="Ciudad"
-                    value={company.city}
-                    onChange={(e) => setCompany({ ...company, city: e.target.value })}
+                  <Select
+                    label="País"
+                    value={company.country_code}
+                    onChange={(e) => setCompany({ ...company, country_code: e.target.value })}
+                    options={[
+                      { value: "AR", label: "Argentina" },
+                      { value: "UY", label: "Uruguay" },
+                      { value: "CL", label: "Chile" },
+                      { value: "PY", label: "Paraguay" },
+                      { value: "BR", label: "Brasil" },
+                      { value: "MX", label: "México" },
+                      { value: "ES", label: "España" },
+                    ]}
                   />
                   <Input
                     label="Moneda"
@@ -255,6 +269,42 @@ export default function OnboardingPage() {
                     onChange={(e) => setCompany({ ...company, currency_code: e.target.value })}
                   />
                 </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    label="Provincia"
+                    value={company.province}
+                    onChange={(e) => setCompany({ ...company, province: e.target.value })}
+                    placeholder="Buenos Aires"
+                  />
+                  <Input
+                    label="Ciudad"
+                    value={company.city}
+                    onChange={(e) => setCompany({ ...company, city: e.target.value })}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    label="Código postal"
+                    value={company.postal_code}
+                    onChange={(e) => setCompany({ ...company, postal_code: e.target.value })}
+                  />
+                  <Input
+                    label="Teléfono"
+                    value={company.phone}
+                    onChange={(e) => setCompany({ ...company, phone: e.target.value })}
+                  />
+                </div>
+                <Input
+                  label="Domicilio fiscal"
+                  value={company.address}
+                  onChange={(e) => setCompany({ ...company, address: e.target.value })}
+                />
+                <Input
+                  label="Email de la empresa"
+                  type="email"
+                  value={company.email}
+                  onChange={(e) => setCompany({ ...company, email: e.target.value })}
+                />
               </div>
             </div>
           )}
@@ -364,23 +414,54 @@ export default function OnboardingPage() {
                 IVA por defecto y prefijos de documentos.
               </p>
               <div className="mt-6 space-y-4">
-                <Input
-                  label="Nombre del impuesto"
-                  value={taxRates[0]?.name || ""}
-                  onChange={(e) =>
-                    setTaxRates([{ ...taxRates[0], name: e.target.value, is_default: true }])
-                  }
-                />
-                <Input
-                  label="Alícuota (%)"
-                  type="number"
-                  value={taxRates[0]?.rate ?? 21}
-                  onChange={(e) =>
-                    setTaxRates([
-                      { ...taxRates[0], rate: parseFloat(e.target.value) || 0, is_default: true },
-                    ])
-                  }
-                />
+                <p className="text-sm font-medium text-slate-700">Alícuotas de IVA</p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { name: "IVA 21%", rate: 21 },
+                    { name: "IVA 10,5%", rate: 10.5 },
+                    { name: "IVA 27%", rate: 27 },
+                    { name: "IVA 2,5%", rate: 2.5 },
+                    { name: "Exento", rate: 0 },
+                  ].map((opt) => {
+                    const selected = taxRates.some((t) => t.rate === opt.rate);
+                    return (
+                      <button
+                        key={opt.rate}
+                        type="button"
+                        onClick={() => {
+                          if (selected) {
+                            const next = taxRates.filter((t) => t.rate !== opt.rate);
+                            setTaxRates(next.length ? next : [{ name: opt.name, rate: opt.rate, is_default: true }]);
+                          } else {
+                            const next = [
+                              ...taxRates.map((t) => ({ ...t, is_default: false })),
+                              { name: opt.name, rate: opt.rate, is_default: taxRates.length === 0 },
+                            ];
+                            if (!next.some((t) => t.is_default)) next[0].is_default = true;
+                            setTaxRates(next);
+                          }
+                        }}
+                        className={`rounded-full border px-3 py-1.5 text-sm ${
+                          selected
+                            ? "border-brand-600 bg-brand-50 text-brand-800"
+                            : "border-slate-200 text-slate-600 hover:border-slate-300"
+                        }`}
+                      >
+                        {opt.name}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="rounded-lg border border-slate-200 divide-y">
+                  {taxRates.map((tr, i) => (
+                    <div key={i} className="flex items-center justify-between px-3 py-2 text-sm">
+                      <span>{tr.name} ({tr.rate}%)</span>
+                      {tr.is_default && (
+                        <span className="text-xs text-brand-700 font-medium">Por defecto</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
                 <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
                   Numeración automática: <strong>FAC-00001</strong>, <strong>COT-00001</strong>,{" "}
                   <strong>PED-00001</strong>

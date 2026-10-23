@@ -111,7 +111,7 @@ async def list_stock_levels(
     search: Optional[str] = None,
 ) -> dict:
     page = max(1, page)
-    page_size = min(max(1, page_size), 100)
+    page_size = min(max(1, page_size), 10000)
 
     base = select(StockLevel).where(StockLevel.company_id == company_id)
 
@@ -124,9 +124,14 @@ async def list_stock_levels(
 
     if search:
         term = f"%{search.strip()}%"
-        # Join con productos para buscar por nombre/sku
+        # Join con productos para buscar por nombre/sku/marca/ean
         base = base.join(Product, Product.id == StockLevel.product_id).where(
-            or_(Product.name.ilike(term), Product.sku.ilike(term))
+            or_(
+                Product.name.ilike(term),
+                Product.sku.ilike(term),
+                Product.barcode.ilike(term),
+                Product.brand.ilike(term),
+            )
         )
 
     count_q = select(func.count()).select_from(base.subquery())
@@ -138,8 +143,54 @@ async def list_stock_levels(
     )
     levels = result.scalars().all()
 
+    # Enriquecer con datos de producto / almacén / categoría
+    product_ids = {lv.product_id for lv in levels}
+    warehouse_ids = {lv.warehouse_id for lv in levels}
+    products_map: dict = {}
+    warehouses_map: dict = {}
+    categories_map: dict = {}
+    if product_ids:
+        from app.models.product import ProductCategory
+
+        prows = (
+            await db.execute(select(Product).where(Product.id.in_(product_ids)))
+        ).scalars().all()
+        products_map = {p.id: p for p in prows}
+        cat_ids = {p.category_id for p in prows if p.category_id}
+        if cat_ids:
+            cats = (
+                await db.execute(
+                    select(ProductCategory).where(ProductCategory.id.in_(cat_ids))
+                )
+            ).scalars().all()
+            categories_map = {c.id: c for c in cats}
+    if warehouse_ids:
+        from app.models.company import Warehouse
+
+        wrows = (
+            await db.execute(select(Warehouse).where(Warehouse.id.in_(warehouse_ids)))
+        ).scalars().all()
+        warehouses_map = {w.id: w for w in wrows}
+
+    items = []
+    for lv in levels:
+        row = _to_stock_level_out(lv)
+        prod = products_map.get(lv.product_id)
+        wh = warehouses_map.get(lv.warehouse_id)
+        if prod:
+            row["product_name"] = prod.name
+            row["product_sku"] = prod.sku
+            row["product_barcode"] = prod.barcode
+            row["product_brand"] = prod.brand
+            row["unit"] = prod.unit
+            cat = categories_map.get(prod.category_id) if prod.category_id else None
+            row["category_name"] = cat.name if cat else None
+        if wh:
+            row["warehouse_name"] = wh.name
+        items.append(row)
+
     return {
-        "items": [_to_stock_level_out(lv) for lv in levels],
+        "items": items,
         "total": total,
         "page": page,
         "page_size": page_size,

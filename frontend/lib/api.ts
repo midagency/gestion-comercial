@@ -31,6 +31,7 @@ api.interceptors.response.use(
   }
 );
 
+// ---- Auth ----
 export async function login(email: string, password: string) {
   const { data } = await api.post("/auth/login", { email, password });
   return data as { access_token: string; refresh_token: string };
@@ -41,6 +42,7 @@ export async function getMe() {
   return data;
 }
 
+// ---- Onboarding ----
 export async function getModuleRecommendations(businessType: string) {
   const { data } = await api.get(`/onboarding/recommendations/${businessType}`);
   return data;
@@ -63,11 +65,13 @@ export async function completeOnboarding(payload: unknown) {
   };
 }
 
+// ---- Reports ----
 export async function getDashboard() {
   const { data } = await api.get("/reports/dashboard");
   return data;
 }
 
+// ---- Partners ----
 export async function listPartners(params?: Record<string, unknown>) {
   const { data } = await api.get("/partners", { params });
   return data;
@@ -93,6 +97,7 @@ export async function deletePartner(id: string) {
   return data;
 }
 
+// ---- Products ----
 export async function listProducts(params?: Record<string, unknown>) {
   const { data } = await api.get("/products", { params });
   return data;
@@ -118,6 +123,7 @@ export async function deleteProduct(id: string) {
   return data;
 }
 
+// ---- Inventory ----
 export async function getStockSummary() {
   const { data } = await api.get("/inventory/summary");
   return data;
@@ -128,6 +134,9 @@ export async function listStockLevels(params?: Record<string, unknown>) {
   return data;
 }
 
+
+
+// ---- Inventory (extended) ----
 export async function exportStockLevels(params?: Record<string, unknown>) {
   const { data } = await api.get("/inventory/levels/export", {
     params,
@@ -156,11 +165,13 @@ export async function listWarehouses() {
   return data;
 }
 
+// ---- Sales ----
 export async function listOrders(params?: Record<string, unknown>) {
   const { data } = await api.get("/orders", { params });
   return data;
 }
 
+// ---- POS ----
 export async function searchPosProducts(q?: string, warehouseId?: string) {
   const { data } = await api.get("/pos/products", {
     params: { q, warehouse_id: warehouseId, limit: 30 },
@@ -173,6 +184,7 @@ export async function createPosSale(payload: unknown) {
   return data;
 }
 
+// ---- Treasury ----
 export async function listRegisters() {
   const { data } = await api.get("/treasury/registers");
   return data;
@@ -189,7 +201,10 @@ export async function openCashSession(payload: unknown) {
 }
 
 export async function closeCashSession(sessionId: string, payload?: unknown) {
-  const { data } = await api.post(`/treasury/sessions/${sessionId}/close`, payload || {});
+  const { data } = await api.post(
+    `/treasury/sessions/${sessionId}/close`,
+    payload || {}
+  );
   return data;
 }
 
@@ -213,6 +228,9 @@ export async function getTreasurySummary() {
   return data;
 }
 
+
+
+// ---- Sales (extended) ----
 export async function getOrder(id: string) {
   const { data } = await api.get(`/orders/${id}`);
   return data;
@@ -252,7 +270,20 @@ export async function createPayment(payload: unknown) {
   const { data } = await api.post("/payments", payload);
   return data;
 }
+export async function listPayments(params?: Record<string, unknown>) {
+  const { data } = await api.get("/payments", { params });
+  return data;
+}
+export async function createDebitNote(payload: unknown) {
+  const { data } = await api.post("/debit-notes", payload);
+  return data;
+}
+export async function listDebitNotes(params?: Record<string, unknown>) {
+  const { data } = await api.get("/debit-notes", { params });
+  return data;
+}
 
+// ---- Purchases ----
 export async function listPurchaseOrders(params?: Record<string, unknown>) {
   const { data } = await api.get("/purchase-orders", { params });
   return data;
@@ -303,6 +334,8 @@ export async function postSupplierInvoice(id: string) {
   return data;
 }
 
+
+// ---- Accounting / Reports extended ----
 export async function getAgingReceivable(asOf?: string) {
   const { data } = await api.get("/reports/aging/receivable", {
     params: asOf ? { as_of: asOf } : undefined,
@@ -347,6 +380,7 @@ export async function createBankTransaction(payload: unknown) {
   return data;
 }
 
+
 export async function getTopProducts(params?: Record<string, unknown>) {
   const { data } = await api.get("/reports/sales/by-product", { params });
   return data;
@@ -372,6 +406,8 @@ export async function getCashSessionsReport(params?: Record<string, unknown>) {
   return data;
 }
 
+
+// ---- Priority modules: documents + settings ----
 export async function createCreditNote(payload: unknown) {
   const { data } = await api.post("/credit-notes", payload);
   return data;
@@ -413,6 +449,10 @@ export function printTicketUrl(id: string) {
   return `${base}/print/ticket/${id}`;
 }
 
+/**
+ * Abre documento imprimible en ventana nueva.
+ * Usa el token Bearer (window.open a la API no envía Authorization).
+ */
 export async function openPrintDocument(
   kind: "invoice" | "ticket" | "delivery-note",
   id: string
@@ -485,6 +525,8 @@ export async function listPermissions() {
   return data;
 }
 
+
+// ---- Medium priority: accounting formal, checks, e-invoice, export ----
 export async function listAccounts() {
   const { data } = await api.get("/accounting/accounts");
   return data;
@@ -517,8 +559,15 @@ export async function createCheck(payload: unknown) {
   const { data } = await api.post("/checks", payload);
   return data;
 }
-export async function updateCheckStatus(id: string, status: string) {
-  const { data } = await api.patch(`/checks/${id}/status`, { status });
+export async function updateCheckStatus(
+  id: string,
+  status: string,
+  bank_account_id?: string
+) {
+  const { data } = await api.patch(`/checks/${id}/status`, {
+    status,
+    bank_account_id: bank_account_id || undefined,
+  });
   return data;
 }
 export async function authorizeInvoice(id: string, payload?: unknown) {
@@ -537,29 +586,28 @@ export function exportCsvUrl(resource: "partners" | "products" | "invoices") {
   const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
   return `${base}/export/${resource}.csv`;
 }
-
 export async function listPriceLists(params?: Record<string, unknown>) {
-  const { data } = await api.get("/price-lists", { params });
+  const { data } = await api.get("/products/price-lists", { params });
   return data;
 }
 export async function createPriceList(payload: unknown) {
-  const { data } = await api.post("/price-lists", payload);
+  const { data } = await api.post("/products/price-lists", payload);
   return data;
 }
 export async function getPriceList(id: string) {
-  const { data } = await api.get(`/price-lists/${id}`);
+  const { data } = await api.get(`/products/price-lists/${id}`);
   return data;
 }
 export async function updatePriceList(id: string, payload: unknown) {
-  const { data } = await api.patch(`/price-lists/${id}`, payload);
+  const { data } = await api.patch(`/products/price-lists/${id}`, payload);
   return data;
 }
 export async function deletePriceList(id: string) {
-  const { data } = await api.delete(`/price-lists/${id}`);
+  const { data } = await api.delete(`/products/price-lists/${id}`);
   return data;
 }
 export async function addPriceListItem(priceListId: string, payload: unknown) {
-  const { data } = await api.post(`/price-lists/${priceListId}/items`, payload);
+  const { data } = await api.post(`/products/price-lists/${priceListId}/items`, payload);
   return data;
 }
 export async function updatePriceListItem(
@@ -568,15 +616,17 @@ export async function updatePriceListItem(
   payload: unknown
 ) {
   const { data } = await api.patch(
-    `/price-lists/${priceListId}/items/${itemId}`,
+    `/products/price-lists/${priceListId}/items/${itemId}`,
     payload
   );
   return data;
 }
 export async function deletePriceListItem(priceListId: string, itemId: string) {
-  await api.delete(`/price-lists/${priceListId}/items/${itemId}`);
+  await api.delete(`/products/price-lists/${priceListId}/items/${itemId}`);
 }
 
+
+// ---- Low priority modules ----
 export async function listOpportunities(params?: Record<string, unknown>) {
   const { data } = await api.get("/crm/opportunities", { params });
   return data;

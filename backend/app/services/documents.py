@@ -225,6 +225,133 @@ async def list_credit_notes(
 
 # ---- Remitos ----
 
+
+async def create_debit_note(
+    db: AsyncSession,
+    company_id: UUID,
+    user_id: UUID,
+    data,  # DebitNoteCreate
+) -> Invoice:
+    """Nota de débito: aumenta el saldo a cobrar del cliente."""
+    result = await db.execute(
+        select(Invoice)
+        .options(selectinload(Invoice.lines))
+        .where(
+            Invoice.id == data.related_invoice_id,
+            Invoice.company_id == company_id,
+            Invoice.invoice_type == "invoice",
+        )
+    )
+    origin = result.scalar_one_or_none()
+    if not origin:
+        raise ValueError("Factura de origen no encontrada")
+    if origin.status == "cancelled":
+        raise ValueError("No se puede emitir ND sobre factura cancelada")
+
+    if data.lines:
+        lines_src = [
+            {
+                "product_id": ln.product_id,
+                "description": ln.description,
+                "quantity": ln.quantity,
+                "unit_price": ln.unit_price,
+                "discount_pct": ln.discount_pct,
+                "tax_rate": ln.tax_rate,
+                "subtotal": _line_subtotal(ln.quantity, ln.unit_price, ln.discount_pct),
+            }
+            for ln in data.lines
+        ]
+    else:
+        lines_src = [
+            {
+                "product_id": ln.product_id,
+                "description": ln.description,
+                "quantity": float(ln.quantity),
+                "unit_price": float(ln.unit_price),
+                "discount_pct": float(ln.discount_pct),
+                "tax_rate": float(ln.tax_rate),
+                "subtotal": float(ln.subtotal),
+            }
+            for ln in origin.lines
+        ]
+
+    subtotal = round(sum(l["subtotal"] for l in lines_src), 2)
+    tax_amount = round(
+        sum(round(l["subtotal"] * l["tax_rate"] / 100, 2) for l in lines_src), 2
+    )
+    total = round(subtotal + tax_amount, 2)
+
+    number = await _next_number(db, company_id, "ND", Invoice, "invoice_number")
+    nd = Invoice(
+        company_id=company_id,
+        partner_id=origin.partner_id,
+        sale_order_id=origin.sale_order_id,
+        related_invoice_id=origin.id,
+        invoice_number=number,
+        invoice_type="debit_note",
+        status="posted",
+        credit_reason=data.reason,
+        invoice_date=date.today(),
+        currency_code=origin.currency_code,
+        subtotal=subtotal,
+        tax_amount=tax_amount,
+        total=total,
+        amount_paid=0,
+        notes=data.notes or f"ND sobre {origin.invoice_number} ({data.reason})",
+        created_by=user_id,
+    )
+    db.add(nd)
+    await db.flush()
+    for ld in lines_src:
+        db.add(
+            InvoiceLine(
+                invoice_id=nd.id,
+                product_id=ld.get("product_id"),
+                description=ld["description"],
+                quantity=ld["quantity"],
+                unit_price=ld["unit_price"],
+                discount_pct=ld["discount_pct"],
+                tax_rate=ld["tax_rate"],
+                subtotal=ld["subtotal"],
+            )
+        )
+    # ND no reduce amount_paid de origen: el cliente adeuda más (nueva deuda)
+    await db.flush()
+    await db.refresh(nd, attribute_names=["lines"])
+    return nd
+
+
+async def list_debit_notes(
+    db: AsyncSession,
+    company_id: UUID,
+    *,
+    page: int = 1,
+    page_size: int = 20,
+) -> dict:
+    page = max(1, page)
+    page_size = min(max(1, page_size), 100)
+    base = (
+        select(Invoice)
+        .options(selectinload(Invoice.lines))
+        .where(
+            Invoice.company_id == company_id,
+            Invoice.invoice_type == "debit_note",
+        )
+    )
+    total = (await db.execute(select(func.count()).select_from(base.subquery()))).scalar() or 0
+    offset = (page - 1) * page_size
+    items = (
+        await db.execute(base.order_by(Invoice.created_at.desc()).offset(offset).limit(page_size))
+    ).scalars().unique().all()
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "pages": ceil(total / page_size) if page_size else 0,
+    }
+
+
 async def create_delivery_note(
     db: AsyncSession, company_id: UUID, user_id: UUID, data: DeliveryNoteCreate
 ) -> DeliveryNote:

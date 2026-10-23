@@ -67,6 +67,7 @@ async def seed_chart_of_accounts(db: AsyncSession, company_id: UUID) -> list[Acc
         parent_id = None
         if "." in code:
             parent_code = code.rsplit(".", 1)[0]
+            # try hierarchical parent: 1.1.01 -> 1.1 -> 1
             while parent_code and parent_code not in code_to_id:
                 if "." not in parent_code:
                     break
@@ -181,6 +182,7 @@ async def list_journal_entries(
 
 
 async def trial_balance(db: AsyncSession, company_id: UUID) -> list[dict]:
+    """Sumas y saldos por cuenta (solo asientos posted)."""
     q = (
         select(
             Account.id,
@@ -219,6 +221,8 @@ async def trial_balance(db: AsyncSession, company_id: UUID) -> list[dict]:
         )
     return out
 
+
+# ---- Cheques ----
 
 async def create_check(
     db: AsyncSession, company_id: UUID, user_id: UUID, data: CheckCreate
@@ -285,6 +289,7 @@ async def update_check_status(
             raise ValueError("Cuenta bancaria no encontrada")
 
         if new_status == "deposited":
+            # Cheque de terceros depositado → ingreso
             ba.current_balance = float(ba.current_balance or 0) + float(chk.amount)
             db.add(
                 BankTransaction(
@@ -301,6 +306,7 @@ async def update_check_status(
                 )
             )
         elif new_status == "cleared":
+            # Acreditación / débito del cheque → egreso de la cuenta
             if float(ba.current_balance or 0) < float(chk.amount):
                 raise ValueError(
                     f"Saldo insuficiente ({ba.current_balance}) para acreditar cheque {chk.amount}"
@@ -327,6 +333,8 @@ async def update_check_status(
     await db.refresh(chk)
     return chk
 
+
+# ---- E-invoice (simulado AFIP) ----
 
 async def authorize_invoice(
     db: AsyncSession,
@@ -359,6 +367,7 @@ async def authorize_invoice(
         if inv.status == "draft":
             inv.status = "posted"
     else:
+        # Placeholder para integración real AFIP WSFE
         inv.fiscal_status = "pending"
         inv.fiscal_point_of_sale = data.point_of_sale
         inv.fiscal_voucher_type = data.voucher_type
@@ -370,6 +379,8 @@ async def authorize_invoice(
     await db.refresh(inv)
     return inv
 
+
+# ---- Notifications ----
 
 async def create_notification(
     db: AsyncSession,

@@ -271,6 +271,12 @@ async def complete_onboarding(db: AsyncSession, data: OnboardingComplete) -> dic
         tax_id=data.step2.tax_id,
         country_code=data.step2.country_code,
         currency_code=data.step2.currency_code,
+        province=data.step2.province,
+        city=data.step2.city,
+        postal_code=data.step2.postal_code,
+        address=data.step2.address,
+        email=str(data.step2.email) if data.step2.email else None,
+        phone=data.step2.phone,
         business_type=data.step1.business_type.value,
         settings={
             "enabled_modules": data.step4.enabled_modules,

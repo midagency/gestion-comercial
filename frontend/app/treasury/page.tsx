@@ -26,6 +26,8 @@ import {
   createBankAccount,
   listBankTransactions,
   createBankTransaction,
+  listChecks,
+  updateCheckStatus,
 } from "@/lib/api";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import {
@@ -41,7 +43,7 @@ import {
   ChevronUp,
 } from "lucide-react";
 
-type TabId = "registers" | "sessions" | "banks";
+type TabId = "registers" | "sessions" | "banks" | "checks";
 
 export default function TreasuryPage() {
   const qc = useQueryClient();
@@ -317,6 +319,27 @@ export default function TreasuryPage() {
     adjustment: "Ajuste",
   };
 
+
+  const { data: checks, isLoading: checksLoading } = useQuery({
+    queryKey: ["checks"],
+    queryFn: () => listChecks(),
+    enabled: tab === "checks",
+  });
+
+  const checkStatusMut = useMutation({
+    mutationFn: ({ id, status, bank_account_id }: { id: string; status: string; bank_account_id?: string }) =>
+      updateCheckStatus(id, status, bank_account_id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["checks"] });
+      qc.invalidateQueries({ queryKey: ["bank-accounts"] });
+      success("Cheque actualizado");
+    },
+    onError: (e: unknown) => {
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || "Error";
+      toastError("Error", String(msg));
+    },
+  });
+
   return (
     <AppShell>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -402,6 +425,7 @@ export default function TreasuryPage() {
             { id: "registers" as const, label: "Cajas" },
             { id: "sessions" as const, label: "Sesiones" },
             { id: "banks" as const, label: "Bancos" },
+            { id: "checks" as const, label: "Cheques" },
           ] as const
         ).map((t) => (
           <button
@@ -1231,6 +1255,72 @@ export default function TreasuryPage() {
           </div>
         </div>
       </Modal>
+    
+      {tab === "checks" && (
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            Cheques de terceros (cobros) y propios (pagos). Depositar suma a la cuenta banco; Acreditar descuenta de la cuenta.
+          </p>
+          {checksLoading && <PageLoader />}
+          {!checksLoading && (!(checks as unknown[]) || (checks as unknown[]).length === 0) && (
+            <EmptyState title="Sin cheques" description="Se cargan al emitir recibos o órdenes de pago con medio cheque." />
+          )}
+          <div className="space-y-2">
+            {(Array.isArray(checks) ? checks : []).map((c: Record<string, unknown>) => {
+              const days = c.days_to_due as number | null | undefined;
+              const dueLabel =
+                days === null || days === undefined
+                  ? "—"
+                  : days < 0
+                    ? `Vencido hace ${Math.abs(days)} día(s)`
+                    : days === 0
+                      ? "Vence hoy"
+                      : `Vence en ${days} día(s)`;
+              return (
+                <div key={String(c.id)} className="rounded-xl border border-slate-200 bg-white p-4 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="font-medium text-slate-900">
+                      {String(c.check_number)} · {String(c.bank_name || "Sin banco")}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {c.check_kind === "own" ? "Propio" : "Terceros"} · {String(c.status)} · {dueLabel}
+                    </p>
+                    <p className="text-sm font-semibold tabular-nums mt-1">{formatCurrency(Number(c.amount))}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    {String(c.status) === "pending" && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          const bank = window.prompt("ID de cuenta bancaria para depositar:");
+                          if (!bank) return;
+                          checkStatusMut.mutate({ id: String(c.id), status: "deposited", bank_account_id: bank });
+                        }}
+                      >
+                        Depositar
+                      </Button>
+                    )}
+                    {(String(c.status) === "pending" || String(c.status) === "deposited") && (
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          const bank = window.prompt("ID de cuenta bancaria para acreditar/debitar:");
+                          if (!bank) return;
+                          checkStatusMut.mutate({ id: String(c.id), status: "cleared", bank_account_id: bank });
+                        }}
+                      >
+                        Acreditar
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
     </AppShell>
   );
 }

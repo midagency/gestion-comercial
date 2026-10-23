@@ -2,10 +2,13 @@
 API de Inventario: niveles de stock, movimientos, transferencias y alertas.
 """
 
+import csv
+import io
 from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 
 from app.api.deps import CurrentUser, DBSession
@@ -87,6 +90,82 @@ async def list_stock_levels(
         page=result["page"],
         page_size=result["page_size"],
         pages=result["pages"],
+    )
+
+
+@router.get(
+    "/levels/export",
+    summary="Exportar stock a Excel/CSV (respeta filtros)",
+)
+async def export_stock_levels(
+    db: DBSession,
+    current_user: CurrentUser,
+    warehouse_id: Optional[UUID] = None,
+    product_id: Optional[UUID] = None,
+    low_stock_only: bool = Query(False),
+    search: Optional[str] = Query(None),
+    brand: Optional[str] = Query(None, description="Filtro por marca de producto"),
+):
+    """Exporta el control de stock con los mismos filtros de la grilla."""
+    result = await inventory_service.list_stock_levels(
+        db,
+        current_user.company_id,
+        page=1,
+        page_size=10000,
+        warehouse_id=warehouse_id,
+        product_id=product_id,
+        low_stock_only=low_stock_only,
+        search=search,
+    )
+    items = result["items"]
+    if brand:
+        brand_l = brand.strip().lower()
+        items = [
+            i
+            for i in items
+            if brand_l in str(i.get("product_brand") or i.get("brand") or "").lower()
+        ]
+
+    buf = io.StringIO()
+    writer = csv.writer(buf, delimiter=";")
+    writer.writerow(
+        [
+            "SKU",
+            "EAN",
+            "Producto",
+            "Marca",
+            "Categoría",
+            "Almacén",
+            "Cantidad",
+            "Mínimo",
+            "Máximo",
+            "Unidad",
+        ]
+    )
+    for i in items:
+        writer.writerow(
+            [
+                i.get("product_sku") or "",
+                i.get("product_barcode") or "",
+                i.get("product_name") or "",
+                i.get("product_brand") or "",
+                i.get("category_name") or "",
+                i.get("warehouse_name") or "",
+                i.get("qty_on_hand") if i.get("qty_on_hand") is not None else i.get("quantity", 0),
+                i.get("min_qty") or "",
+                i.get("max_qty") or "",
+                i.get("unit") or "unit",
+            ]
+        )
+    buf.seek(0)
+    # BOM para que Excel abra bien UTF-8
+    content = "\ufeff" + buf.getvalue()
+    return StreamingResponse(
+        iter([content]),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": 'attachment; filename="control_stock.csv"',
+        },
     )
 
 

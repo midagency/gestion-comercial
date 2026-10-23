@@ -9,6 +9,10 @@ from uuid import UUID
 from pydantic import BaseModel, Field, model_validator
 
 
+# ---------------------------------------------------------------------------
+# Líneas de pedido
+# ---------------------------------------------------------------------------
+
 class SaleOrderLineCreate(BaseModel):
     product_id: UUID
     variant_id: Optional[UUID] = None
@@ -32,6 +36,10 @@ class SaleOrderLineOut(BaseModel):
 
     model_config = {"from_attributes": True}
 
+
+# ---------------------------------------------------------------------------
+# Pedidos / Cotizaciones
+# ---------------------------------------------------------------------------
 
 class SaleOrderCreate(BaseModel):
     partner_id: UUID
@@ -88,6 +96,10 @@ class SaleOrderListResponse(BaseModel):
     pages: int
 
 
+# ---------------------------------------------------------------------------
+# Facturas
+# ---------------------------------------------------------------------------
+
 class InvoiceLineCreate(BaseModel):
     product_id: Optional[UUID] = None
     description: str = Field(..., min_length=1)
@@ -116,9 +128,22 @@ class InvoiceCreate(BaseModel):
     invoice_type: str = Field("invoice", pattern="^(invoice|credit_note|debit_note)$")
     invoice_date: Optional[date] = None
     due_date: Optional[date] = None
-    currency_code: Optional[str] = None
+    currency_code: Optional[str] = Field(None, min_length=3, max_length=3)
     notes: Optional[str] = None
     lines: List[InvoiceLineCreate] = Field(..., min_length=1)
+
+
+class InvoiceFromOrder(BaseModel):
+    """Generar factura a partir de un pedido confirmado."""
+    invoice_date: Optional[date] = None
+    due_date: Optional[date] = None
+    notes: Optional[str] = None
+
+
+class InvoiceUpdate(BaseModel):
+    due_date: Optional[date] = None
+    notes: Optional[str] = None
+    status: Optional[str] = Field(None, pattern="^(draft|posted|paid|cancelled)$")
 
 
 class InvoiceOut(BaseModel):
@@ -126,14 +151,9 @@ class InvoiceOut(BaseModel):
     company_id: UUID
     partner_id: UUID
     sale_order_id: Optional[UUID]
-    related_invoice_id: Optional[UUID] = None
     invoice_number: str
     invoice_type: str
     status: str
-    credit_reason: Optional[str] = None
-    cae: Optional[str] = None
-    cae_due_date: Optional[date] = None
-    fiscal_status: Optional[str] = None
     invoice_date: date
     due_date: Optional[date]
     currency_code: Optional[str]
@@ -141,7 +161,7 @@ class InvoiceOut(BaseModel):
     tax_amount: float
     total: float
     amount_paid: float
-    amount_due: Optional[float] = None
+    amount_due: float  # total - amount_paid
     notes: Optional[str]
     created_by: Optional[UUID]
     created_at: datetime
@@ -158,6 +178,10 @@ class InvoiceListResponse(BaseModel):
     pages: int
 
 
+# ---------------------------------------------------------------------------
+# Pagos
+# ---------------------------------------------------------------------------
+
 class PaymentCreate(BaseModel):
     """Recibo de cobro. payment_method: cash | transfer | check | card | other"""
     partner_id: UUID
@@ -170,6 +194,7 @@ class PaymentCreate(BaseModel):
     bank_account_id: Optional[UUID] = Field(
         None, description="Obligatorio si payment_method = transfer"
     )
+    # Datos de cheque de terceros (si payment_method = check)
     check_number: Optional[str] = None
     check_bank_name: Optional[str] = None
     check_due_date: Optional[date] = None

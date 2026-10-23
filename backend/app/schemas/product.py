@@ -75,9 +75,11 @@ class VariantOut(BaseModel):
 class ProductCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=250)
     sku: Optional[str] = Field(None, max_length=80)
-    barcode: Optional[str] = Field(None, max_length=80)
+    barcode: Optional[str] = Field(None, max_length=80, description="Código EAN / barras")
+    brand: Optional[str] = Field(None, max_length=120, description="Marca")
     description: Optional[str] = None
     category_id: Optional[UUID] = None
+    subcategory_id: Optional[UUID] = None
     product_type: str = Field(
         "product",
         pattern="^(product|service|kit)$",
@@ -101,8 +103,10 @@ class ProductUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=250)
     sku: Optional[str] = Field(None, max_length=80)
     barcode: Optional[str] = Field(None, max_length=80)
+    brand: Optional[str] = Field(None, max_length=120)
     description: Optional[str] = None
     category_id: Optional[UUID] = None
+    subcategory_id: Optional[UUID] = None
     product_type: Optional[str] = Field(None, pattern="^(product|service|kit)$")
     track_stock: Optional[bool] = None
     track_lots: Optional[bool] = None
@@ -119,6 +123,8 @@ class ProductOut(BaseModel):
     id: UUID
     company_id: UUID
     category_id: Optional[UUID]
+    subcategory_id: Optional[UUID] = None
+    brand: Optional[str] = None
     sku: Optional[str]
     barcode: Optional[str]
     name: str
@@ -178,6 +184,8 @@ class PriceListItemOut(BaseModel):
 class PriceListCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     currency_code: str = Field("ARS", min_length=3, max_length=3)
+    discount_percent: float = Field(0, ge=0, le=100, description="% de descuento de la lista")
+    discount_amount: float = Field(0, ge=0, description="Monto fijo de descuento")
     is_default: bool = False
     items: List[PriceListItemCreate] = Field(default_factory=list)
 
@@ -185,6 +193,8 @@ class PriceListCreate(BaseModel):
 class PriceListUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     currency_code: Optional[str] = Field(None, min_length=3, max_length=3)
+    discount_percent: Optional[float] = Field(None, ge=0, le=100)
+    discount_amount: Optional[float] = Field(None, ge=0)
     is_default: Optional[bool] = None
     is_active: Optional[bool] = None
 
@@ -194,6 +204,8 @@ class PriceListOut(BaseModel):
     company_id: UUID
     name: str
     currency_code: str
+    discount_percent: Optional[float] = 0
+    discount_amount: Optional[float] = 0
     is_default: bool
     is_active: bool
     items: List[PriceListItemOut] = []

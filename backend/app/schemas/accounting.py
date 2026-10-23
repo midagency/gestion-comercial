@@ -103,7 +103,7 @@ class CheckOut(BaseModel):
     bank_account_id: Optional[UUID]
     notes: Optional[str]
     created_at: datetime
-    days_to_due: Optional[int] = None
+    days_to_due: Optional[int] = None  # días hasta vencimiento (negativo = vencido)
 
     model_config = {"from_attributes": True}
 

@@ -24,6 +24,12 @@ class Company(Base):
     logo_url: Mapped[Optional[str]] = mapped_column(Text)
     country_code: Mapped[str] = mapped_column(String(2), default="AR")
     currency_code: Mapped[str] = mapped_column(String(3), default="ARS")
+    province: Mapped[Optional[str]] = mapped_column(String(100))
+    city: Mapped[Optional[str]] = mapped_column(String(100))
+    postal_code: Mapped[Optional[str]] = mapped_column(String(20))
+    address: Mapped[Optional[str]] = mapped_column(Text)  # domicilio fiscal
+    email: Mapped[Optional[str]] = mapped_column(String(255))
+    phone: Mapped[Optional[str]] = mapped_column(String(40))
     business_type: Mapped[Optional[str]] = mapped_column(String(50))  # retail, wholesale, services...
     # Configuración flexible (módulos activos, impuestos, numeración, etc.)
     settings: Mapped[dict] = mapped_column(JSONB, default=dict)

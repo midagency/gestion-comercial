@@ -10,6 +10,7 @@ from app.api.deps import CurrentUser, DBSession
 from app.schemas.documents import (
     CreditNoteCreate,
     CreditNoteOut,
+    DebitNoteCreate,
     DeliveryNoteCreate,
     DeliveryNoteFromOrder,
     DeliveryNoteListResponse,
@@ -55,6 +56,46 @@ async def list_credit_notes(
     page_size: int = Query(20, ge=1, le=100),
 ):
     result = await documents_service.list_credit_notes(
+        db, current_user.company_id, page=page, page_size=page_size
+    )
+    return {
+        "items": [CreditNoteOut.model_validate(i) for i in result["items"]],
+        "total": result["total"],
+        "page": result["page"],
+        "page_size": result["page_size"],
+        "pages": result["pages"],
+    }
+
+
+
+# ---- Notas de débito ----
+
+@router.post(
+    "/debit-notes",
+    response_model=CreditNoteOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Emitir nota de débito",
+)
+async def create_debit_note(
+    data: DebitNoteCreate, db: DBSession, current_user: CurrentUser
+):
+    try:
+        nd = await documents_service.create_debit_note(
+            db, current_user.company_id, current_user.id, data
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return CreditNoteOut.model_validate(nd)
+
+
+@router.get("/debit-notes", summary="Listar notas de débito")
+async def list_debit_notes(
+    db: DBSession,
+    current_user: CurrentUser,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+):
+    result = await documents_service.list_debit_notes(
         db, current_user.company_id, page=page, page_size=page_size
     )
     return {

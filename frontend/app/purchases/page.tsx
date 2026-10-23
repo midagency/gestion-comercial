@@ -23,6 +23,7 @@ import {
   invoiceFromPurchaseOrder,
   listSupplierInvoices,
   paySupplierInvoice,
+  listBankAccounts,
   postSupplierInvoice,
   listPartners,
   listProducts,
@@ -84,6 +85,11 @@ export default function PurchasesPage() {
   const [payInvoice, setPayInvoice] = useState<Record<string, unknown> | null>(null);
   const [payAmount, setPayAmount] = useState("");
   const [payMethod, setPayMethod] = useState("transfer");
+  const [payBankAccount, setPayBankAccount] = useState("");
+  const [payCheckNumber, setPayCheckNumber] = useState("");
+  const [payCheckBank, setPayCheckBank] = useState("");
+  const [payCheckDue, setPayCheckDue] = useState("");
+  const [payCheckKind, setPayCheckKind] = useState("own");
   const [payReference, setPayReference] = useState("");
 
   // Create form
@@ -346,6 +352,11 @@ export default function PurchasesPage() {
     setPayReference("");
   }
 
+  const { data: bankAccounts } = useQuery({
+    queryKey: ["bank-accounts"],
+    queryFn: () => listBankAccounts(),
+  });
+
   function submitPay() {
     if (!payInvoice) return;
     const amount = parseFloat(payAmount);
@@ -359,8 +370,13 @@ export default function PurchasesPage() {
       payload: {
         invoice_id: payInvoice.id,
         amount,
-        payment_method: payMethod,
+                payment_method: payMethod,
         reference: payReference || undefined,
+        bank_account_id: payMethod === "transfer" ? payBankAccount || undefined : undefined,
+        check_kind: payMethod === "check" ? payCheckKind : undefined,
+        check_number: payMethod === "check" ? payCheckNumber || undefined : undefined,
+        check_bank_name: payMethod === "check" ? payCheckBank || undefined : undefined,
+        check_due_date: payMethod === "check" && payCheckDue ? payCheckDue : undefined,
       },
     });
   }
@@ -450,7 +466,7 @@ export default function PurchasesPage() {
               { value: "confirmed", label: "Confirmadas" },
               { value: "partial", label: "Parciales" },
               { value: "received", label: "Recibidas" },
-              { value: "cancelled", label: "Canceladas" },
+              /* canceladas ocultas */
             ].map((f) => (
               <button
                 key={f.value}
@@ -476,7 +492,7 @@ export default function PurchasesPage() {
               { value: "posted", label: "Contabilizadas" },
               { value: "partial", label: "Pago parcial" },
               { value: "paid", label: "Pagadas" },
-              { value: "cancelled", label: "Canceladas" },
+              /* canceladas ocultas */
             ].map((f) => (
               <button
                 key={f.value}
@@ -1109,13 +1125,43 @@ export default function PurchasesPage() {
             value={payMethod}
             onChange={(e) => setPayMethod(e.target.value)}
             options={[
-              { value: "transfer", label: "Transferencia" },
+              { value: "transfer", label: "Transferencia bancaria" },
               { value: "cash", label: "Efectivo" },
               { value: "check", label: "Cheque" },
               { value: "card", label: "Tarjeta" },
               { value: "other", label: "Otro" },
             ]}
           />
+          {payMethod === "transfer" && (
+            <Select
+              label="Cuenta bancaria *"
+              value={payBankAccount}
+              onChange={(e) => setPayBankAccount(e.target.value)}
+              options={(Array.isArray(bankAccounts) ? bankAccounts : (bankAccounts as { items?: unknown[] })?.items || []).map(
+                (a: Record<string, unknown>) => ({
+                  value: String(a.id),
+                  label: `${a.name}${a.bank_name ? ` (${a.bank_name})` : ""} · saldo ${a.current_balance ?? 0}`,
+                })
+              )}
+              placeholder="Seleccionar cuenta"
+            />
+          )}
+          {payMethod === "check" && (
+            <>
+              <Select
+                label="Tipo de cheque"
+                value={payCheckKind}
+                onChange={(e) => setPayCheckKind(e.target.value)}
+                options={[
+                  { value: "own", label: "Propio" },
+                  { value: "third_party", label: "De terceros" },
+                ]}
+              />
+              <Input label="N° de cheque *" value={payCheckNumber} onChange={(e) => setPayCheckNumber(e.target.value)} />
+              <Input label="Banco" value={payCheckBank} onChange={(e) => setPayCheckBank(e.target.value)} />
+              <Input label="Vencimiento" type="date" value={payCheckDue} onChange={(e) => setPayCheckDue(e.target.value)} />
+            </>
+          )}
           <Input
             label="Referencia"
             value={payReference}

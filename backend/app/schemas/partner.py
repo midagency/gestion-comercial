@@ -16,14 +16,16 @@ class PartnerBase(BaseModel):
         description="customer | supplier | both",
         examples=["customer"],
     )
-    name: str = Field(..., min_length=1, max_length=250)
-    legal_name: Optional[str] = Field(None, max_length=250)
+    name: str = Field(..., min_length=1, max_length=250, description="Nombre de fantasía")
+    legal_name: Optional[str] = Field(None, max_length=250, description="Razón social")
     tax_id: Optional[str] = Field(None, max_length=50)
     email: Optional[EmailStr] = None
     phone: Optional[str] = Field(None, max_length=40)
     mobile: Optional[str] = Field(None, max_length=40)
-    address: Optional[str] = None
+    address: Optional[str] = Field(None, description="Domicilio fiscal")
     city: Optional[str] = Field(None, max_length=100)
+    province: Optional[str] = Field(None, max_length=100)
+    postal_code: Optional[str] = Field(None, max_length=20)
     country_code: Optional[str] = Field(None, min_length=2, max_length=2)
     price_list_id: Optional[UUID] = None
     payment_term_days: int = Field(0, ge=0)
@@ -47,6 +49,8 @@ class PartnerUpdate(BaseModel):
     mobile: Optional[str] = Field(None, max_length=40)
     address: Optional[str] = None
     city: Optional[str] = Field(None, max_length=100)
+    province: Optional[str] = Field(None, max_length=100)
+    postal_code: Optional[str] = Field(None, max_length=20)
     country_code: Optional[str] = Field(None, min_length=2, max_length=2)
     price_list_id: Optional[UUID] = None
     payment_term_days: Optional[int] = Field(None, ge=0)

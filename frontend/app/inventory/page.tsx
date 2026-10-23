@@ -15,6 +15,7 @@ import { useToast } from "@/components/ui/Toast";
 import {
   getStockSummary,
   listStockLevels,
+  exportStockLevels,
   listStockMoves,
   createStockMove,
   updateStockThresholds,
@@ -33,6 +34,7 @@ import {
   History,
   Search,
   Warehouse,
+  Download,
 } from "lucide-react";
 
 const moveTypeLabel: Record<string, string> = {
@@ -261,6 +263,30 @@ export default function InventoryPage() {
     return p.sku ? `${p.name} (${p.sku})` : p.name;
   }
 
+
+  async function handleExportStock() {
+    try {
+      const blob = await exportStockLevels({
+        warehouse_id: warehouseFilter || undefined,
+        search: search || undefined,
+        low_stock_only: tab === "alerts" ? true : undefined,
+        page_size: 10000,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "control_stock.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+      success("Exportación lista");
+    } catch (e: unknown) {
+      const msg =
+        (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+        "No se pudo exportar";
+      toastError("Error", String(msg));
+    }
+  }
+
   const levelItems = levels?.items ?? [];
   const moveItems = moves?.items ?? [];
   const warehouseList = warehouses || [];
@@ -275,6 +301,11 @@ export default function InventoryPage() {
         <Button onClick={openMoveForm}>
           <Plus className="h-4 w-4" /> Nuevo movimiento
         </Button>
+            <Button type="button" variant="secondary" onClick={handleExportStock}>
+              <Download className="h-4 w-4" />
+              Exportar Excel
+            </Button>
+
       </div>
 
       {/* KPIs */}

@@ -317,6 +317,8 @@ async def create_price_list(
         company_id=company_id,
         name=data.name,
         currency_code=data.currency_code,
+        discount_percent=data.discount_percent or 0,
+        discount_amount=data.discount_amount or 0,
         is_default=data.is_default,
     )
     db.add(pl)

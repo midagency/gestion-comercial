@@ -25,19 +25,29 @@ type PartnerType = "customer" | "supplier" | "both";
 interface PartnerForm {
   partner_type: PartnerType;
   name: string;
+  legal_name: string;
   email: string;
   phone: string;
   tax_id: string;
+  country_code: string;
+  province: string;
   city: string;
+  address: string;
+  postal_code: string;
 }
 
 const emptyForm: PartnerForm = {
   partner_type: "customer",
   name: "",
+  legal_name: "",
   email: "",
   phone: "",
   tax_id: "",
+  country_code: "AR",
+  province: "",
   city: "",
+  address: "",
+  postal_code: "",
 };
 
 const typeLabels: Record<string, string> = {
@@ -114,10 +124,15 @@ export default function PartnersPage() {
     setForm({
       partner_type: (p.partner_type as PartnerType) || "customer",
       name: String(p.name || ""),
+      legal_name: String(p.legal_name || ""),
       email: String(p.email || ""),
       phone: String(p.phone || ""),
       tax_id: String(p.tax_id || ""),
+      country_code: String(p.country_code || "AR"),
+      province: String(p.province || ""),
       city: String(p.city || ""),
+      address: String(p.address || ""),
+      postal_code: String(p.postal_code || ""),
     });
     setShowForm(true);
   }
@@ -287,10 +302,54 @@ export default function PartnersPage() {
             ]}
           />
           <Input
-            label="Nombre *"
+            label="Nombre de fantasía *"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
             required
+          />
+          <Input
+            label="Razón social"
+            value={form.legal_name}
+            onChange={(e) => setForm({ ...form, legal_name: e.target.value })}
+          />
+          <Input
+            label="CUIT / Tax ID"
+            value={form.tax_id}
+            onChange={(e) => setForm({ ...form, tax_id: e.target.value })}
+          />
+          <Select
+            label="País"
+            value={form.country_code}
+            onChange={(e) => setForm({ ...form, country_code: e.target.value })}
+            options={[
+              { value: "AR", label: "Argentina" },
+              { value: "UY", label: "Uruguay" },
+              { value: "CL", label: "Chile" },
+              { value: "PY", label: "Paraguay" },
+              { value: "BR", label: "Brasil" },
+              { value: "MX", label: "México" },
+              { value: "ES", label: "España" },
+            ]}
+          />
+          <Input
+            label="Provincia"
+            value={form.province}
+            onChange={(e) => setForm({ ...form, province: e.target.value })}
+          />
+          <Input
+            label="Ciudad"
+            value={form.city}
+            onChange={(e) => setForm({ ...form, city: e.target.value })}
+          />
+          <Input
+            label="Código postal"
+            value={form.postal_code}
+            onChange={(e) => setForm({ ...form, postal_code: e.target.value })}
+          />
+          <Input
+            label="Teléfono"
+            value={form.phone}
+            onChange={(e) => setForm({ ...form, phone: e.target.value })}
           />
           <Input
             label="Email"
@@ -299,19 +358,10 @@ export default function PartnersPage() {
             onChange={(e) => setForm({ ...form, email: e.target.value })}
           />
           <Input
-            label="Teléfono"
-            value={form.phone}
-            onChange={(e) => setForm({ ...form, phone: e.target.value })}
-          />
-          <Input
-            label="CUIT / Tax ID"
-            value={form.tax_id}
-            onChange={(e) => setForm({ ...form, tax_id: e.target.value })}
-          />
-          <Input
-            label="Ciudad"
-            value={form.city}
-            onChange={(e) => setForm({ ...form, city: e.target.value })}
+            label="Domicilio fiscal"
+            value={form.address}
+            onChange={(e) => setForm({ ...form, address: e.target.value })}
+            className="sm:col-span-2"
           />
           <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
             <Button type="button" variant="secondary" onClick={closeForm}>

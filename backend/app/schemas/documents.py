@@ -53,6 +53,15 @@ class CreditNoteOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class DebitNoteCreate(BaseModel):
+    related_invoice_id: UUID = Field(..., description="Factura de venta origen")
+    reason: str = Field("other", pattern="^(interest|adjustment|error|other)$")
+    notes: Optional[str] = None
+    lines: Optional[List[CreditNoteLineCreate]] = Field(
+        None, description="Si se omite, se copian las líneas de la factura"
+    )
+
+
 # ---- Remitos ----
 
 class DeliveryNoteLineCreate(BaseModel):

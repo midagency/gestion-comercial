@@ -36,12 +36,16 @@ import {
 interface ListForm {
   name: string;
   currency_code: string;
+  discount_percent: number;
+  discount_amount: number;
   is_default: boolean;
 }
 
 const emptyListForm: ListForm = {
   name: "",
   currency_code: "ARS",
+  discount_percent: 0,
+  discount_amount: 0,
   is_default: false,
 };
 
@@ -200,6 +204,8 @@ export default function PriceListsPage() {
     setListForm({
       name: String(pl.name || ""),
       currency_code: String(pl.currency_code || "ARS"),
+      discount_percent: Number(pl.discount_percent || 0),
+      discount_amount: Number(pl.discount_amount || 0),
       is_default: Boolean(pl.is_default),
     });
     setShowListForm(true);
@@ -499,7 +505,36 @@ export default function PriceListsPage() {
               { value: "UYU", label: "UYU — Peso uruguayo" },
             ]}
           />
-          <label className="flex items-center gap-2">
+                    <Input
+            label="% de descuento"
+            type="number"
+            min={0}
+            max={100}
+            step="0.01"
+            value={String(listForm.discount_percent)}
+            onChange={(e) =>
+              setListForm({
+                ...listForm,
+                discount_percent: parseFloat(e.target.value) || 0,
+              })
+            }
+            hint="Descuento global de la lista"
+          />
+          <Input
+            label="Monto de descuento"
+            type="number"
+            min={0}
+            step="0.01"
+            value={String(listForm.discount_amount)}
+            onChange={(e) =>
+              setListForm({
+                ...listForm,
+                discount_amount: parseFloat(e.target.value) || 0,
+              })
+            }
+            hint="Monto fijo (opcional)"
+          />
+<label className="flex items-center gap-2">
             <input
               type="checkbox"
               checked={listForm.is_default}

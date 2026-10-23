@@ -38,8 +38,12 @@ class OnboardingStep2(BaseModel):
     tax_id: Optional[str] = Field(None, max_length=50, description="CUIT / NIF / RFC")
     country_code: str = Field("AR", min_length=2, max_length=2)
     currency_code: str = Field("ARS", min_length=3, max_length=3)
-    address: Optional[str] = None
-    city: Optional[str] = None
+    province: Optional[str] = Field(None, max_length=100, description="Provincia / Estado")
+    city: Optional[str] = Field(None, max_length=100, description="Ciudad")
+    postal_code: Optional[str] = Field(None, max_length=20, description="Código postal")
+    address: Optional[str] = Field(None, description="Domicilio fiscal")
+    email: Optional[EmailStr] = Field(None, description="Email de la empresa")
+    phone: Optional[str] = Field(None, max_length=40, description="Teléfono")
 
 
 # ------------------------------------------------------------------

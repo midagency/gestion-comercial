@@ -648,7 +648,23 @@ async def list_payments(
 async def create_payment(
     db: AsyncSession, company_id: UUID, user_id: UUID, data: PaymentCreate
 ) -> Payment:
+    """
+    Emite recibo de cobro.
+    - Actualiza cuenta corriente del cliente (amount_paid de la factura).
+    - transfer → ingreso en cuenta bancaria.
+    - check → crea cheque de terceros (pending).
+    """
     await _validate_partner(db, company_id, data.partner_id)
+
+    method = (data.payment_method or "cash").lower().strip()
+    if method in ("transfer", "transferencia", "bank"):
+        method = "transfer"
+        if not data.bank_account_id:
+            raise ValueError("Indicá la cuenta bancaria para cobro por transferencia")
+    if method in ("check", "cheque"):
+        method = "check"
+        if not data.check_number:
+            raise ValueError("Indicá el número de cheque (de terceros)")
 
     invoice = None
     if data.invoice_id:
@@ -656,9 +672,68 @@ async def create_payment(
         if not invoice:
             raise ValueError("Factura no encontrada")
         if invoice.status == "cancelled":
-            raise ValueError("No se puede pagar una factura cancelada")
+            raise ValueError("No se puede cobrar una factura cancelada")
         if invoice.partner_id != data.partner_id:
-            raise ValueError("El cliente del pago no coincide con el de la factura")
+            raise ValueError("El cliente del recibo no coincide con el de la factura")
+
+    # Número de recibo simple
+    from sqlalchemy import func as sa_func
+
+    cnt = (
+        await db.execute(
+            select(sa_func.count()).select_from(Payment).where(Payment.company_id == company_id)
+        )
+    ).scalar() or 0
+    receipt_number = f"REC-{cnt + 1:05d}"
+
+    check_id = None
+    if method == "check":
+        from app.models.accounting import Check
+
+        chk = Check(
+            company_id=company_id,
+            check_kind="third_party",
+            bank_name=data.check_bank_name,
+            check_number=data.check_number,
+            amount=data.amount,
+            due_date=data.check_due_date,
+            partner_id=data.partner_id,
+            status="pending",
+            created_by=user_id,
+            notes=f"Cobro recibo {receipt_number}",
+        )
+        db.add(chk)
+        await db.flush()
+        check_id = chk.id
+
+    if method == "transfer" and data.bank_account_id:
+        from app.models.treasury import BankAccount, BankTransaction
+
+        ba = (
+            await db.execute(
+                select(BankAccount).where(
+                    BankAccount.id == data.bank_account_id,
+                    BankAccount.company_id == company_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if not ba:
+            raise ValueError("Cuenta bancaria no encontrada")
+        ba.current_balance = float(ba.current_balance or 0) + float(data.amount)
+        db.add(
+            BankTransaction(
+                company_id=company_id,
+                account_id=ba.id,
+                transaction_type="deposit",
+                direction="income",
+                amount=data.amount,
+                transaction_date=data.payment_date or date.today(),
+                description=f"Cobro recibo {receipt_number}",
+                reference=data.reference or receipt_number,
+                reference_type="payment",
+                created_by=user_id,
+            )
+        )
 
     payment = Payment(
         company_id=company_id,
@@ -666,15 +741,20 @@ async def create_payment(
         invoice_id=data.invoice_id,
         amount=data.amount,
         payment_date=data.payment_date or date.today(),
-        payment_method=data.payment_method,
+        payment_method=method,
         reference=data.reference,
         notes=data.notes,
+        bank_account_id=data.bank_account_id,
+        check_id=check_id,
+        receipt_number=receipt_number,
         created_by=user_id,
     )
     db.add(payment)
 
+    # Cuenta corriente cliente
     if invoice:
-        invoice.amount_paid = float(invoice.amount_paid) + data.amount
+        # Actualiza cuenta corriente: suma amount_paid (reduce saldo a cobrar)
+        invoice.amount_paid = float(invoice.amount_paid) + float(data.amount)
         if float(invoice.amount_paid) >= float(invoice.total):
             invoice.status = "paid"
         elif invoice.status == "draft":

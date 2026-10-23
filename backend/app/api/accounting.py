@@ -115,10 +115,19 @@ async def list_checks(
     check_kind: Optional[str] = Query(None, pattern="^(third_party|own)$"),
     status: Optional[str] = None,
 ):
+    from datetime import date as date_cls
+
     items = await accounting_service.list_checks(
         db, current_user.company_id, check_kind=check_kind, status=status
     )
-    return [CheckOut.model_validate(c) for c in items]
+    out = []
+    today = date_cls.today()
+    for c in items:
+        row = CheckOut.model_validate(c)
+        if c.due_date:
+            row.days_to_due = (c.due_date - today).days
+        out.append(row)
+    return out
 
 
 @router.post("/checks", response_model=CheckOut, status_code=status.HTTP_201_CREATED)
