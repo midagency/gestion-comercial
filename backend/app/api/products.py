@@ -183,9 +183,11 @@ async def update_product(
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     try:
         product = await product_service.update_product(db, product, data)
+        return ProductOut.model_validate(product)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    return ProductOut.model_validate(product)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al actualizar producto: {e}")
 
 
 @router.delete(

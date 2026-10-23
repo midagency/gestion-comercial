@@ -32,10 +32,52 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Desarrollo local sin Docker: create_all opcional.
-    # Producción: Alembic (scripts/entrypoint.sh → alembic upgrade head).
+    # Producción: Alembic (scripts/start_cloud.sh → alembic upgrade head).
     if settings.AUTO_CREATE_SCHEMA and settings.DEBUG:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+    # Red de seguridad: columnas de catálogo que a veces faltan si falló una migración
+    try:
+        from sqlalchemy import text
+        async with engine.begin() as conn:
+            await conn.execute(text(
+                "ALTER TABLE products ADD COLUMN IF NOT EXISTS brand VARCHAR(120)"
+            ))
+            await conn.execute(text(
+                "ALTER TABLE products ADD COLUMN IF NOT EXISTS subcategory_id UUID"
+            ))
+            await conn.execute(text(
+                "ALTER TABLE price_lists ADD COLUMN IF NOT EXISTS discount_percent NUMERIC(8,4) DEFAULT 0"
+            ))
+            await conn.execute(text(
+                "ALTER TABLE price_lists ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(14,2) DEFAULT 0"
+            ))
+            await conn.execute(text(
+                "ALTER TABLE companies ADD COLUMN IF NOT EXISTS province VARCHAR(100)"
+            ))
+            await conn.execute(text(
+                "ALTER TABLE companies ADD COLUMN IF NOT EXISTS city VARCHAR(100)"
+            ))
+            await conn.execute(text(
+                "ALTER TABLE companies ADD COLUMN IF NOT EXISTS postal_code VARCHAR(20)"
+            ))
+            await conn.execute(text(
+                "ALTER TABLE companies ADD COLUMN IF NOT EXISTS address TEXT"
+            ))
+            await conn.execute(text(
+                "ALTER TABLE companies ADD COLUMN IF NOT EXISTS email VARCHAR(255)"
+            ))
+            await conn.execute(text(
+                "ALTER TABLE companies ADD COLUMN IF NOT EXISTS phone VARCHAR(40)"
+            ))
+            await conn.execute(text(
+                "ALTER TABLE partners ADD COLUMN IF NOT EXISTS province VARCHAR(100)"
+            ))
+            await conn.execute(text(
+                "ALTER TABLE partners ADD COLUMN IF NOT EXISTS postal_code VARCHAR(20)"
+            ))
+    except Exception as e:
+        print(f"[lifespan] ensure columns skipped: {e}")
     yield
     await engine.dispose()
 

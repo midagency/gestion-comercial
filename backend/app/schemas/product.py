@@ -122,28 +122,59 @@ class ProductUpdate(BaseModel):
 class ProductOut(BaseModel):
     id: UUID
     company_id: UUID
-    category_id: Optional[UUID]
+    category_id: Optional[UUID] = None
     subcategory_id: Optional[UUID] = None
     brand: Optional[str] = None
-    sku: Optional[str]
-    barcode: Optional[str]
+    sku: Optional[str] = None
+    barcode: Optional[str] = None
     name: str
-    description: Optional[str]
-    product_type: str
-    track_stock: bool
-    track_lots: bool
-    track_serials: bool
-    cost_method: str
-    unit: str
-    weight: Optional[float]
-    is_active: bool
-    images: List[Any]
-    attributes: Dict[str, Any]
+    description: Optional[str] = None
+    product_type: str = "product"
+    track_stock: bool = True
+    track_lots: bool = False
+    track_serials: bool = False
+    cost_method: str = "average"
+    unit: str = "unit"
+    weight: Optional[float] = None
+    is_active: bool = True
+    images: List[Any] = []
+    attributes: Dict[str, Any] = {}
     variants: List[VariantOut] = []
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
+
+    @classmethod
+    def model_validate(cls, obj, *args, **kwargs):
+        # Normalizar None → defaults para JSONB
+        if not isinstance(obj, dict):
+            data = {
+                "id": getattr(obj, "id", None),
+                "company_id": getattr(obj, "company_id", None),
+                "category_id": getattr(obj, "category_id", None),
+                "subcategory_id": getattr(obj, "subcategory_id", None),
+                "brand": getattr(obj, "brand", None),
+                "sku": getattr(obj, "sku", None),
+                "barcode": getattr(obj, "barcode", None),
+                "name": getattr(obj, "name", ""),
+                "description": getattr(obj, "description", None),
+                "product_type": getattr(obj, "product_type", "product") or "product",
+                "track_stock": bool(getattr(obj, "track_stock", True)),
+                "track_lots": bool(getattr(obj, "track_lots", False)),
+                "track_serials": bool(getattr(obj, "track_serials", False)),
+                "cost_method": getattr(obj, "cost_method", "average") or "average",
+                "unit": getattr(obj, "unit", "unit") or "unit",
+                "weight": float(obj.weight) if getattr(obj, "weight", None) is not None else None,
+                "is_active": bool(getattr(obj, "is_active", True)),
+                "images": getattr(obj, "images", None) or [],
+                "attributes": getattr(obj, "attributes", None) or {},
+                "variants": list(getattr(obj, "variants", None) or []),
+                "created_at": getattr(obj, "created_at", None),
+                "updated_at": getattr(obj, "updated_at", None),
+            }
+            return super().model_validate(data, *args, **kwargs)
+        return super().model_validate(obj, *args, **kwargs)
 
 
 class ProductListResponse(BaseModel):

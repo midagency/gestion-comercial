@@ -9,6 +9,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import text
 
 
 revision: str = "002_extend"
@@ -17,47 +18,63 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+def _add_column_if_missing(table: str, column: str, ddl: str) -> None:
+    """PostgreSQL: agrega columna solo si no existe."""
+    conn = op.get_bind()
+    exists = conn.execute(
+        text(
+            "SELECT 1 FROM information_schema.columns "
+            "WHERE table_name = :t AND column_name = :c"
+        ),
+        {"t": table, "c": column},
+    ).scalar()
+    if not exists:
+        op.execute(text(f"ALTER TABLE {table} ADD COLUMN {ddl}"))
+
+
 def upgrade() -> None:
-    # companies
-    op.add_column("companies", sa.Column("province", sa.String(100), nullable=True))
-    op.add_column("companies", sa.Column("city", sa.String(100), nullable=True))
-    op.add_column("companies", sa.Column("postal_code", sa.String(20), nullable=True))
-    op.add_column("companies", sa.Column("address", sa.Text(), nullable=True))
-    op.add_column("companies", sa.Column("email", sa.String(255), nullable=True))
-    op.add_column("companies", sa.Column("phone", sa.String(40), nullable=True))
+    _add_column_if_missing("companies", "province", "province VARCHAR(100)")
+    _add_column_if_missing("companies", "city", "city VARCHAR(100)")
+    _add_column_if_missing("companies", "postal_code", "postal_code VARCHAR(20)")
+    _add_column_if_missing("companies", "address", "address TEXT")
+    _add_column_if_missing("companies", "email", "email VARCHAR(255)")
+    _add_column_if_missing("companies", "phone", "phone VARCHAR(40)")
 
-    # partners
-    op.add_column("partners", sa.Column("province", sa.String(100), nullable=True))
-    op.add_column("partners", sa.Column("postal_code", sa.String(20), nullable=True))
+    _add_column_if_missing("partners", "province", "province VARCHAR(100)")
+    _add_column_if_missing("partners", "postal_code", "postal_code VARCHAR(20)")
 
-    # products
-    op.add_column(
+    _add_column_if_missing(
         "products",
-        sa.Column("subcategory_id", sa.UUID(), sa.ForeignKey("product_categories.id", ondelete="SET NULL"), nullable=True),
+        "subcategory_id",
+        "subcategory_id UUID REFERENCES product_categories(id) ON DELETE SET NULL",
     )
-    op.add_column("products", sa.Column("brand", sa.String(120), nullable=True))
+    _add_column_if_missing("products", "brand", "brand VARCHAR(120)")
 
-    # price_lists
-    op.add_column(
+    _add_column_if_missing(
         "price_lists",
-        sa.Column("discount_percent", sa.Numeric(8, 4), server_default="0", nullable=True),
+        "discount_percent",
+        "discount_percent NUMERIC(8,4) DEFAULT 0",
     )
-    op.add_column(
+    _add_column_if_missing(
         "price_lists",
-        sa.Column("discount_amount", sa.Numeric(14, 2), server_default="0", nullable=True),
+        "discount_amount",
+        "discount_amount NUMERIC(14,2) DEFAULT 0",
     )
 
 
 def downgrade() -> None:
-    op.drop_column("price_lists", "discount_amount")
-    op.drop_column("price_lists", "discount_percent")
-    op.drop_column("products", "brand")
-    op.drop_column("products", "subcategory_id")
-    op.drop_column("partners", "postal_code")
-    op.drop_column("partners", "province")
-    op.drop_column("companies", "phone")
-    op.drop_column("companies", "email")
-    op.drop_column("companies", "address")
-    op.drop_column("companies", "postal_code")
-    op.drop_column("companies", "city")
-    op.drop_column("companies", "province")
+    for table, col in [
+        ("price_lists", "discount_amount"),
+        ("price_lists", "discount_percent"),
+        ("products", "brand"),
+        ("products", "subcategory_id"),
+        ("partners", "postal_code"),
+        ("partners", "province"),
+        ("companies", "phone"),
+        ("companies", "email"),
+        ("companies", "address"),
+        ("companies", "postal_code"),
+        ("companies", "city"),
+        ("companies", "province"),
+    ]:
+        op.execute(text(f"ALTER TABLE {table} DROP COLUMN IF EXISTS {col}"))
