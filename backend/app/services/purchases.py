@@ -226,9 +226,12 @@ async def create_order(
 
     lines_data = []
     for ln in data.lines:
-        await _validate_product(db, company_id, ln.product_id)
+        prod = await _validate_product(db, company_id, ln.product_id)
         st = _line_subtotal(ln.quantity, ln.unit_price, ln.discount_pct)
-        lines_data.append({**ln.model_dump(), "subtotal": st})
+        dump = ln.model_dump()
+        if not dump.get("description"):
+            dump["description"] = prod.name
+        lines_data.append({**dump, "subtotal": st})
 
     subtotal, tax_amount, total = _calc_totals(lines_data)
     order_number = await _next_number(db, company_id, "OC", PurchaseOrder)
@@ -324,7 +327,10 @@ async def confirm_order(db: AsyncSession, order: PurchaseOrder) -> PurchaseOrder
         raise ValueError("Solo se pueden confirmar órdenes en estado draft")
     order.status = "confirmed"
     await db.flush()
-    await db.refresh(order, attribute_names=["lines"])
+    try:
+        await db.refresh(order, attribute_names=["lines"])
+    except Exception:
+        await db.refresh(order)
     return order
 
 

@@ -317,21 +317,22 @@ async def complete_onboarding(db: AsyncSession, data: OnboardingComplete) -> dic
 
     await db.flush()
 
-    # 3. Almacenes
+    # 3. Almacenes — un solo almacén por defecto; solo varios si el usuario los define
     if data.step3.has_multiple_locations and data.step3.warehouses:
-        for w in data.step3.warehouses:
-            branch_id = None
+        for i, w in enumerate(data.step3.warehouses):
+            branch_id = created_branches[0].id
             if w.branch_index is not None and 0 <= w.branch_index < len(created_branches):
                 branch_id = created_branches[w.branch_index].id
             warehouse = Warehouse(
                 company_id=company.id,
                 branch_id=branch_id,
-                name=w.name,
-                code=w.code,
-                is_main=w.is_main,
+                name=w.name or f"Almacén {i + 1}",
+                code=w.code or f"WH-{i + 1:02d}",
+                is_main=w.is_main if w.is_main is not None else (i == 0),
             )
             db.add(warehouse)
     else:
+        # Una sola ubicación → un solo almacén
         warehouse = Warehouse(
             company_id=company.id,
             branch_id=created_branches[0].id,
@@ -421,6 +422,25 @@ async def complete_onboarding(db: AsyncSession, data: OnboardingComplete) -> dic
             notes="Cliente creado automáticamente para que explores el sistema.",
         )
         db.add(partner)
+
+    # Consumidor Final (siempre, para ventas de mostrador / ticket)
+    existing_cf = await db.execute(
+        select(Partner).where(
+            Partner.company_id == company.id,
+            Partner.name == "Consumidor Final",
+        )
+    )
+    if not existing_cf.scalar_one_or_none():
+        db.add(
+            Partner(
+                company_id=company.id,
+                partner_type="customer",
+                name="Consumidor Final",
+                legal_name="Consumidor Final",
+                tax_id="00-00000000-0",
+                notes="Cliente genérico para ventas de mostrador / sin identificar.",
+            )
+        )
 
     await db.commit()
 

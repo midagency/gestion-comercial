@@ -34,6 +34,8 @@ import {
   listDeliveryNotes,
   createDeliveryNoteFromOrder,
   listWarehouses,
+  listPriceLists,
+  getPriceList,
 } from "@/lib/api";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import {
@@ -113,6 +115,8 @@ export default function SalesPage() {
 
   // Create form
   const [partnerId, setPartnerId] = useState("");
+  const [priceMap, setPriceMap] = useState<Record<string, number>>({});
+  const [activePriceListId, setActivePriceListId] = useState("");
   const [orderType, setOrderType] = useState("order");
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<LineForm[]>([]);
@@ -187,6 +191,38 @@ export default function SalesPage() {
     });
     return map;
   }, [customers]);
+
+
+  // Lista de precios del cliente (o lista default)
+  const { data: allPriceLists } = useQuery({
+    queryKey: ["price-lists"],
+    queryFn: () => listPriceLists({ page_size: 50 }),
+  });
+
+  async function loadPricesForPartner(pid: string) {
+    setPriceMap({});
+    setActivePriceListId("");
+    const partners = customers?.items || [];
+    const partner = partners.find((c: Record<string, unknown>) => String(c.id) === pid);
+    let listId = partner?.price_list_id ? String(partner.price_list_id) : "";
+    if (!listId) {
+      const lists = allPriceLists?.items || [];
+      const def = lists.find((pl: Record<string, unknown>) => pl.is_default) || lists[0];
+      if (def) listId = String(def.id);
+    }
+    if (!listId) return;
+    setActivePriceListId(listId);
+    try {
+      const detail = await getPriceList(listId);
+      const map: Record<string, number> = {};
+      for (const it of detail?.items || []) {
+        map[String(it.product_id)] = Number(it.price) || 0;
+      }
+      setPriceMap(map);
+    } catch {
+      /* ignore */
+    }
+  }
 
   const createMut = useMutation({
     mutationFn: createOrder,
@@ -315,13 +351,15 @@ export default function SalesPage() {
 
   function addProduct(p: Record<string, unknown>) {
     if (lines.some((l) => l.product_id === String(p.id))) return;
+    const pid = String(p.id);
+    const price = priceMap[pid] ?? 0;
     setLines([
       ...lines,
       {
-        product_id: String(p.id),
+        product_id: pid,
         product_name: String(p.name),
         quantity: 1,
-        unit_price: 0,
+        unit_price: price,
         discount_pct: 0,
         tax_rate: 21,
       },
@@ -1125,7 +1163,7 @@ export default function SalesPage() {
           <Select
             label="Cliente *"
             value={partnerId}
-            onChange={(e) => setPartnerId(e.target.value)}
+            onChange={(e) => { setPartnerId(e.target.value); loadPricesForPartner(e.target.value); }}
             options={[
               { value: "", label: "Seleccionar cliente..." },
               ...(customers?.items || []).map((c: Record<string, unknown>) => ({

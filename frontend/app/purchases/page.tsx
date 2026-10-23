@@ -314,6 +314,7 @@ export default function PurchasesPage() {
       notes: notes || undefined,
       lines: lines.map((l) => ({
         product_id: l.product_id,
+        description: l.product_name,
         quantity: l.quantity,
         unit_price: l.unit_price,
         tax_rate: l.tax_rate,

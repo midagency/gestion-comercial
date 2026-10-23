@@ -54,13 +54,25 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=settings.CORS_ORIGINS or ["*"],
+    allow_origin_regex=r"https://.*\.onrender\.com",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Routers
+
+@app.exception_handler(Exception)
+async def unhandled_exception(request, exc):
+    from fastapi.responses import JSONResponse
+    import traceback
+    traceback.print_exc()
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc) or "Error interno del servidor"},
+    )
+
 app.include_router(auth.router, prefix=settings.API_PREFIX)
 app.include_router(onboarding.router, prefix=settings.API_PREFIX)
 app.include_router(partners.router, prefix=settings.API_PREFIX)

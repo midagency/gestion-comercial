@@ -192,10 +192,17 @@ async def update_product(
         cat = await get_category(db, product.company_id, updates["category_id"])
         if not cat:
             raise ValueError("La categoría no existe")
+    if "subcategory_id" in updates and updates["subcategory_id"]:
+        sub = await get_category(db, product.company_id, updates["subcategory_id"])
+        if not sub:
+            raise ValueError("La subcategoría no existe")
     for field, value in updates.items():
         setattr(product, field, value)
     await db.flush()
-    await db.refresh(product, attribute_names=["variants"])
+    try:
+        await db.refresh(product, attribute_names=["variants"])
+    except Exception:
+        await db.refresh(product)
     return product
 
 

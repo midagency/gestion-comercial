@@ -54,6 +54,15 @@ interface ModuleRec {
   reason: string;
 }
 
+const FALLBACK_MODULES: ModuleRec[] = [
+  { key: "sales", name: "Ventas", description: "Pedidos, facturas, notas de crédito y cobros.", recommended: true, highly_recommended: true, reason: "Esencial" },
+  { key: "purchases", name: "Compras", description: "Órdenes de compra, recepción y facturas de proveedor.", recommended: true, highly_recommended: false, reason: "Recomendado" },
+  { key: "inventory", name: "Inventario", description: "Stock, almacenes y movimientos.", recommended: true, highly_recommended: true, reason: "Recomendado" },
+  { key: "treasury", name: "Caja y bancos", description: "Caja, cuentas bancarias y cheques.", recommended: true, highly_recommended: false, reason: "Recomendado" },
+  { key: "accounting", name: "Contabilidad", description: "Plan de cuentas, asientos y reportes.", recommended: false, highly_recommended: false, reason: "Opcional" },
+  { key: "pos", name: "Punto de venta", description: "Venta rápida de mostrador.", recommended: false, highly_recommended: false, reason: "Opcional" },
+];
+
 export default function OnboardingPage() {
   const router = useRouter();
   const { setTokens, setUser } = useAuthStore();
@@ -91,13 +100,28 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     if (step === 4 && businessType) {
-      getModuleRecommendations(businessType).then((recs: ModuleRec[]) => {
-        setModules(recs);
-        setEnabledModules(recs.filter((r) => r.recommended).map((r) => r.key));
-      });
+      getModuleRecommendations(businessType)
+        .then((recs: ModuleRec[]) => {
+          const list = Array.isArray(recs) && recs.length > 0 ? recs : FALLBACK_MODULES;
+          setModules(list);
+          setEnabledModules(list.filter((r) => r.recommended).map((r) => r.key));
+        })
+        .catch(() => {
+          setModules(FALLBACK_MODULES);
+          setEnabledModules(
+            FALLBACK_MODULES.filter((r) => r.recommended).map((r) => r.key)
+          );
+        });
     }
     if (step === 5 && businessType) {
-      getDefaultPriceLists(businessType).then((lists) => setPriceLists(lists));
+      getDefaultPriceLists(businessType)
+        .then((lists) => {
+          if (Array.isArray(lists) && lists.length > 0) setPriceLists(lists);
+          else setPriceLists([{ name: "General", currency_code: "ARS", is_default: true }]);
+        })
+        .catch(() =>
+          setPriceLists([{ name: "General", currency_code: "ARS", is_default: true }])
+        );
     }
   }, [step, businessType]);
 
