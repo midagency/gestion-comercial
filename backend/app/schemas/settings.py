@@ -16,6 +16,12 @@ class CompanyOut(BaseModel):
     country_code: str
     currency_code: str
     business_type: Optional[str]
+    province: Optional[str] = None
+    city: Optional[str] = None
+    postal_code: Optional[str] = None
+    address: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
     settings: dict
     is_active: bool
     created_at: datetime
@@ -31,6 +37,12 @@ class CompanyUpdate(BaseModel):
     country_code: Optional[str] = Field(None, min_length=2, max_length=2)
     currency_code: Optional[str] = Field(None, min_length=3, max_length=3)
     business_type: Optional[str] = None
+    province: Optional[str] = None
+    city: Optional[str] = None
+    postal_code: Optional[str] = None
+    address: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
     settings: Optional[dict] = None
 
 

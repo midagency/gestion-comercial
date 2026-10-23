@@ -25,10 +25,6 @@ import {
   listRoles,
   createRole,
   listPermissions,
-  listDeliveryNotes,
-  confirmDeliveryNote,
-  markDeliveryNoteDelivered,
-  openPrintDocument,
 } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
 import {
@@ -38,12 +34,11 @@ import {
   Users,
   Package,
   Printer,
-  Truck,
   Shield,
   UserPlus,
 } from "lucide-react";
 
-type TabId = "company" | "locations" | "users" | "roles" | "remitos";
+type TabId = "company" | "locations" | "users" | "roles";
 
 const PERM_LABELS: Record<string, string> = {
   "sales.view": "Ver ventas",
@@ -76,6 +71,12 @@ export default function SettingsPage() {
     tax_id: "",
     currency_code: "ARS",
     country_code: "AR",
+    province: "",
+    city: "",
+    postal_code: "",
+    address: "",
+    email: "",
+    phone: "",
   });
 
   // Branch / warehouse modals
@@ -124,6 +125,12 @@ export default function SettingsPage() {
         tax_id: company.tax_id || "",
         currency_code: company.currency_code || "ARS",
         country_code: company.country_code || "AR",
+        province: company.province || "",
+        city: company.city || "",
+        postal_code: company.postal_code || "",
+        address: company.address || "",
+        email: company.email || "",
+        phone: company.phone || "",
       });
     }
   }, [company]);
@@ -158,12 +165,7 @@ export default function SettingsPage() {
     enabled: tab === "roles" || showRole,
   });
 
-  const { data: remitos, isLoading: remitosLoading } = useQuery({
-    queryKey: ["delivery-notes"],
-    queryFn: () => listDeliveryNotes({ page_size: 50 }),
-    enabled: tab === "remitos",
-  });
-
+  
   const permList: string[] = Array.isArray(permissions)
     ? permissions
     : permissions?.permissions ||
@@ -280,8 +282,8 @@ export default function SettingsPage() {
       action: "confirm" | "deliver";
       id: string;
     }) => {
-      if (action === "confirm") return confirmDeliveryNote(id);
-      return markDeliveryNoteDelivered(id);
+      if (action === "confirm") return(id);
+      return(id);
     },
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ["delivery-notes"] });
@@ -302,14 +304,12 @@ export default function SettingsPage() {
     { id: "locations", label: "Sucursales y almacenes", icon: MapPin },
     { id: "users", label: "Usuarios", icon: Users },
     { id: "roles", label: "Roles", icon: Shield },
-    { id: "remitos", label: "Remitos", icon: Truck },
-  ];
+    ];
 
   const branchList = Array.isArray(branches) ? branches : branches?.items || [];
   const whList = Array.isArray(warehouses) ? warehouses : warehouses?.items || [];
   const userList = Array.isArray(users) ? users : users?.items || [];
   const roleList = Array.isArray(roles) ? roles : roles?.items || [];
-  const remitoList = remitos?.items || [];
 
   return (
     <AppShell>
@@ -317,7 +317,7 @@ export default function SettingsPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Configuración</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Empresa, ubicaciones, usuarios, roles y remitos
+            Empresa, ubicaciones, usuarios y roles
           </p>
         </div>
         {tab === "locations" && (
@@ -383,6 +383,12 @@ export default function SettingsPage() {
                     tax_id: companyForm.tax_id.trim() || undefined,
                     currency_code: companyForm.currency_code,
                     country_code: companyForm.country_code,
+                    province: companyForm.province.trim() || undefined,
+                    city: companyForm.city.trim() || undefined,
+                    postal_code: companyForm.postal_code.trim() || undefined,
+                    address: companyForm.address.trim() || undefined,
+                    email: companyForm.email.trim() || undefined,
+                    phone: companyForm.phone.trim() || undefined,
                   });
                 }}
               >
@@ -447,6 +453,51 @@ export default function SettingsPage() {
                     { value: "ES", label: "España" },
                     { value: "US", label: "Estados Unidos" },
                   ]}
+                />
+                <Input
+                  label="Provincia"
+                  value={companyForm.province}
+                  onChange={(e) =>
+                    setCompanyForm({ ...companyForm, province: e.target.value })
+                  }
+                />
+                <Input
+                  label="Ciudad"
+                  value={companyForm.city}
+                  onChange={(e) =>
+                    setCompanyForm({ ...companyForm, city: e.target.value })
+                  }
+                />
+                <Input
+                  label="Código postal"
+                  value={companyForm.postal_code}
+                  onChange={(e) =>
+                    setCompanyForm({ ...companyForm, postal_code: e.target.value })
+                  }
+                />
+                <Input
+                  label="Teléfono"
+                  value={companyForm.phone}
+                  onChange={(e) =>
+                    setCompanyForm({ ...companyForm, phone: e.target.value })
+                  }
+                />
+                <Input
+                  label="Email"
+                  type="email"
+                  value={companyForm.email}
+                  onChange={(e) =>
+                    setCompanyForm({ ...companyForm, email: e.target.value })
+                  }
+                  className="sm:col-span-2"
+                />
+                <Input
+                  label="Domicilio fiscal"
+                  value={companyForm.address}
+                  onChange={(e) =>
+                    setCompanyForm({ ...companyForm, address: e.target.value })
+                  }
+                  className="sm:col-span-2"
                 />
                 <div className="sm:col-span-2 flex justify-end">
                   <Button type="submit" loading={saveCompany.isPending}>
@@ -677,118 +728,8 @@ export default function SettingsPage() {
       )}
 
       {/* ===== REMITOS ===== */}
-      {tab === "remitos" && (
-        <div className="mt-6">
-          <p className="text-sm text-slate-500 mb-4">
-            Los remitos se generan desde pedidos (API). Acá podés confirmar,
-            marcar entregado e imprimir.
-          </p>
-          {remitosLoading && <PageLoader />}
-          {!remitosLoading && remitoList.length === 0 && (
-            <EmptyState
-              icon={Truck}
-              title="Sin remitos"
-              description="Cuando generes remitos desde pedidos aparecerán aquí."
-            />
-          )}
-          {!remitosLoading && remitoList.length > 0 && (
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-50 text-left text-xs font-medium uppercase text-slate-500">
-                    <tr>
-                      <th className="px-4 py-3">Número</th>
-                      <th className="px-4 py-3">Fecha</th>
-                      <th className="px-4 py-3">Estado</th>
-                      <th className="px-4 py-3 text-right">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {remitoList.map((r: Record<string, unknown>) => {
-                      const st = String(r.status);
-                      return (
-                        <tr key={String(r.id)} className="hover:bg-slate-50/80">
-                          <td className="px-4 py-3 font-mono font-semibold">
-                            {String(r.note_number)}
-                          </td>
-                          <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
-                            {formatDate(String(r.note_date))}
-                          </td>
-                          <td className="px-4 py-3">
-                            <Badge
-                              variant={
-                                st === "delivered"
-                                  ? "success"
-                                  : st === "confirmed"
-                                    ? "info"
-                                    : "default"
-                              }
-                            >
-                              {st}
-                            </Badge>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex justify-end gap-1 flex-wrap">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={async () => {
-                                  try {
-                                    await openPrintDocument(
-                                      "delivery-note",
-                                      String(r.id)
-                                    );
-                                  } catch (e) {
-                                    toastError(
-                                      "No se pudo abrir la impresión",
-                                      e instanceof Error ? e.message : undefined
-                                    );
-                                  }
-                                }}
-                              >
-                                <Printer className="h-3.5 w-3.5" />
-                              </Button>
-                              {st === "draft" && (
-                                <Button
-                                  size="sm"
-                                  variant="secondary"
-                                  loading={remitoMut.isPending}
-                                  onClick={() =>
-                                    remitoMut.mutate({
-                                      action: "confirm",
-                                      id: String(r.id),
-                                    })
-                                  }
-                                >
-                                  Confirmar
-                                </Button>
-                              )}
-                              {(st === "confirmed" || st === "draft") && (
-                                <Button
-                                  size="sm"
-                                  loading={remitoMut.isPending}
-                                  onClick={() =>
-                                    remitoMut.mutate({
-                                      action: "deliver",
-                                      id: String(r.id),
-                                    })
-                                  }
-                                >
-                                  Entregado
-                                </Button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      {/* remitos moved to Ventas */}
+
 
       {/* Modal sucursal */}
       <Modal

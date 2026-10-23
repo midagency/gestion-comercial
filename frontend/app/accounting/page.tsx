@@ -40,11 +40,7 @@ type Tab =
   | "overview"
   | "chart"
   | "entries"
-  | "trial"
-  | "checks"
-  | "einvoice"
-  | "export"
-  | "notifications";
+  | "trial";
 
 export default function AccountingPage() {
   const qc = useQueryClient();
@@ -102,17 +98,17 @@ export default function AccountingPage() {
   const { data: checks } = useQuery({
     queryKey: ["checks"],
     queryFn: () => listChecks(),
-    enabled: tab === "checks",
+    enabled: false,
   });
   const { data: invoices } = useQuery({
     queryKey: ["invoices-fiscal"],
     queryFn: () => listInvoices({ page_size: 50 }),
-    enabled: tab === "einvoice",
+    enabled: false,
   });
   const { data: notifications } = useQuery({
     queryKey: ["notifications"],
     queryFn: () => listNotifications(false),
-    enabled: tab === "notifications",
+    enabled: false,
   });
 
   const seedMut = useMutation({
@@ -205,22 +201,18 @@ export default function AccountingPage() {
   }
 
   const tabs: { id: Tab; label: string }[] = [
-    { id: "overview", label: "Resumen" },
-    { id: "chart", label: "Plan de cuentas" },
-    { id: "entries", label: "Asientos" },
-    { id: "trial", label: "Sumas y saldos" },
-    { id: "checks", label: "Cheques" },
-    { id: "einvoice", label: "Fact. electrónica" },
-    { id: "export", label: "Exportar" },
-    { id: "notifications", label: "Avisos" },
-  ];
+  { id: "overview", label: "Resumen" },
+  { id: "chart", label: "Plan de cuentas" },
+  { id: "entries", label: "Asientos" },
+  { id: "trial", label: "Sumas y saldos" },
+];
 
   return (
     <AppShell>
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Contabilidad</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Operativa + formal · cheques · FE · exportaciones
+          Plan de cuentas, asientos y saldos
         </p>
       </div>
 
@@ -487,266 +479,10 @@ export default function AccountingPage() {
         </div>
       )}
 
-      {tab === "checks" && (
-        <div className="mt-6 space-y-4">
-          <Button size="sm" onClick={() => setShowCheck(true)}>
-            <Plus className="h-4 w-4" /> Registrar cheque
-          </Button>
-          {showCheck && (
-            <Card>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="label">Tipo</label>
-                  <select
-                    className="input"
-                    value={checkForm.check_kind}
-                    onChange={(e) =>
-                      setCheckForm({
-                        ...checkForm,
-                        check_kind: e.target.value,
-                      })
-                    }
-                  >
-                    <option value="third_party">De terceros (recibido)</option>
-                    <option value="own">Propio (emitido)</option>
-                  </select>
-                </div>
-                <Input
-                  label="Banco"
-                  value={checkForm.bank_name}
-                  onChange={(e) =>
-                    setCheckForm({ ...checkForm, bank_name: e.target.value })
-                  }
-                />
-                <Input
-                  label="Número *"
-                  value={checkForm.check_number}
-                  onChange={(e) =>
-                    setCheckForm({
-                      ...checkForm,
-                      check_number: e.target.value,
-                    })
-                  }
-                />
-                <Input
-                  label="Monto *"
-                  type="number"
-                  value={checkForm.amount}
-                  onChange={(e) =>
-                    setCheckForm({ ...checkForm, amount: e.target.value })
-                  }
-                />
-                <Input
-                  label="Vencimiento"
-                  type="date"
-                  value={checkForm.due_date}
-                  onChange={(e) =>
-                    setCheckForm({ ...checkForm, due_date: e.target.value })
-                  }
-                />
-              </div>
-              <Button
-                className="mt-3"
-                loading={checkMut.isPending}
-                disabled={!checkForm.check_number || !checkForm.amount}
-                onClick={() =>
-                  checkMut.mutate({
-                    check_kind: checkForm.check_kind,
-                    bank_name: checkForm.bank_name || undefined,
-                    check_number: checkForm.check_number,
-                    amount: parseFloat(checkForm.amount),
-                    due_date: checkForm.due_date || undefined,
-                  })
-                }
-              >
-                Guardar
-              </Button>
-            </Card>
-          )}
-          <div className="space-y-2">
-            {(checks || []).map((c: Record<string, unknown>) => (
-              <div
-                key={String(c.id)}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3"
-              >
-                <div>
-                  <span className="font-semibold">
-                    {String(c.bank_name || "Cheque")} #{String(c.check_number)}
-                  </span>
-                  <span className="ml-2 badge bg-slate-100">
-                    {String(c.check_kind) === "own" ? "Propio" : "Terceros"}
-                  </span>
-                  <span className="ml-2 badge bg-amber-100 text-amber-800">
-                    {String(c.status)}
-                  </span>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {c.due_date
-                      ? `Vence ${formatDate(String(c.due_date))}`
-                      : formatDate(String(c.issue_date))}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold">
-                    {formatCurrency(Number(c.amount))}
-                  </span>
-                  {String(c.status) === "pending" && (
-                    <>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() =>
-                          checkStatusMut.mutate({
-                            id: String(c.id),
-                            status: "deposited",
-                          })
-                        }
-                      >
-                        Depositar
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() =>
-                          checkStatusMut.mutate({
-                            id: String(c.id),
-                            status: "cleared",
-                          })
-                        }
-                      >
-                        Acreditar
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
-            {(!checks || checks.length === 0) && (
-              <p className="text-center text-slate-400 py-8">
-                Sin cheques registrados
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {tab === "einvoice" && (
-        <div className="mt-6 space-y-3">
-          <Card>
-            <CardTitle>Facturación electrónica</CardTitle>
-            <CardDescription className="mt-1">
-              Modo simulado: genera CAE de prueba sin conectar a AFIP. La
-              integración real queda preparada (simulate=false requiere
-              certificados).
-            </CardDescription>
-          </Card>
-          {(invoices?.items || [])
-            .filter(
-              (i: Record<string, unknown>) =>
-                String(i.invoice_type || "invoice") === "invoice"
-            )
-            .map((inv: Record<string, unknown>) => (
-              <div
-                key={String(inv.id)}
-                className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3"
-              >
-                <div>
-                  <span className="font-mono font-semibold text-sm">
-                    {String(inv.invoice_number)}
-                  </span>
-                  {Boolean(inv.cae) && (
-                    <span className="ml-2 badge bg-green-100 text-green-800">
-                      CAE {String(inv.cae)}
-                    </span>
-                  )}
-                  {Boolean(inv.fiscal_status) && (
-                    <span className="ml-2 badge bg-slate-100">
-                      {String(inv.fiscal_status)}
-                    </span>
-                  )}
-                  <p className="text-xs text-slate-500">
-                    {formatDate(String(inv.invoice_date))} ·{" "}
-                    {formatCurrency(Number(inv.total))}
-                  </p>
-                </div>
-                {!inv.cae && String(inv.status) !== "cancelled" && (
-                  <Button
-                    size="sm"
-                    loading={authMut.isPending}
-                    onClick={() => authMut.mutate(String(inv.id))}
-                  >
-                    Autorizar (simulado)
-                  </Button>
-                )}
-              </div>
-            ))}
-        </div>
-      )}
-
-      {tab === "export" && (
-        <div className="mt-6 grid gap-4 sm:grid-cols-3">
-          {(
-            [
-              ["partners", "Clientes / Proveedores"],
-              ["products", "Productos"],
-              ["invoices", "Facturas"],
-            ] as const
-          ).map(([res, label]) => (
-            <Card key={res}>
-              <CardTitle>{label}</CardTitle>
-              <Button
-                className="mt-4"
-                variant="secondary"
-                onClick={() => downloadCsv(res)}
-              >
-                <Download className="h-4 w-4" /> Descargar CSV
-              </Button>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {tab === "notifications" && (
-        <div className="mt-6 space-y-2">
-          {(notifications || []).map((n: Record<string, unknown>) => (
-            <div
-              key={String(n.id)}
-              className={`rounded-xl border px-4 py-3 ${
-                n.is_read
-                  ? "border-slate-100 bg-slate-50"
-                  : "border-brand-200 bg-brand-50"
-              }`}
-            >
-              <div className="flex justify-between">
-                <span className="font-medium">{String(n.title)}</span>
-                {!n.is_read && (
-                  <button
-                    className="text-xs text-brand-700 underline"
-                    onClick={() =>
-                      markNotificationRead(String(n.id)).then(() =>
-                        qc.invalidateQueries({ queryKey: ["notifications"] })
-                      )
-                    }
-                  >
-                    Marcar leída
-                  </button>
-                )}
-              </div>
-              {Boolean(n.body) && (
-                <p className="text-sm text-slate-600 mt-1">{String(n.body)}</p>
-              )}
-              <p className="text-xs text-slate-400 mt-1">
-                {formatDate(String(n.created_at))}
-              </p>
-            </div>
-          ))}
-          {(!notifications || notifications.length === 0) && (
-            <Card className="text-center py-10">
-              <Bell className="mx-auto h-10 w-10 text-slate-300" />
-              <p className="mt-3 text-slate-500">Sin notificaciones</p>
-            </Card>
-          )}
-        </div>
-      )}
-    </AppShell>
+      {/* {tab === "checks" removed */}
+{/* {tab === "einvoice" removed */}
+{/* {tab === "export" removed */}
+{/* {tab === "notifications" removed */}
+</AppShell>
   );
 }

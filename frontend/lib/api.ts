@@ -98,6 +98,14 @@ export async function deletePartner(id: string) {
 }
 
 // ---- Products ----
+export async function listCategories() {
+  const { data } = await api.get("/categories");
+  return data;
+}
+export async function createCategory(payload: unknown) {
+  const { data } = await api.post("/categories", payload);
+  return data;
+}
 export async function listProducts(params?: Record<string, unknown>) {
   const { data } = await api.get("/products", { params });
   return data;
@@ -587,27 +595,27 @@ export function exportCsvUrl(resource: "partners" | "products" | "invoices") {
   return `${base}/export/${resource}.csv`;
 }
 export async function listPriceLists(params?: Record<string, unknown>) {
-  const { data } = await api.get("/products/price-lists", { params });
+  const { data } = await api.get("/price-lists", { params });
   return data;
 }
 export async function createPriceList(payload: unknown) {
-  const { data } = await api.post("/products/price-lists", payload);
+  const { data } = await api.post("/price-lists", payload);
   return data;
 }
 export async function getPriceList(id: string) {
-  const { data } = await api.get(`/products/price-lists/${id}`);
+  const { data } = await api.get(`/price-lists/${id}`);
   return data;
 }
 export async function updatePriceList(id: string, payload: unknown) {
-  const { data } = await api.patch(`/products/price-lists/${id}`, payload);
+  const { data } = await api.patch(`/price-lists/${id}`, payload);
   return data;
 }
 export async function deletePriceList(id: string) {
-  const { data } = await api.delete(`/products/price-lists/${id}`);
+  const { data } = await api.delete(`/price-lists/${id}`);
   return data;
 }
 export async function addPriceListItem(priceListId: string, payload: unknown) {
-  const { data } = await api.post(`/products/price-lists/${priceListId}/items`, payload);
+  const { data } = await api.post(`/price-lists/${priceListId}/items`, payload);
   return data;
 }
 export async function updatePriceListItem(
@@ -616,13 +624,13 @@ export async function updatePriceListItem(
   payload: unknown
 ) {
   const { data } = await api.patch(
-    `/products/price-lists/${priceListId}/items/${itemId}`,
+    `/price-lists/${priceListId}/items/${itemId}`,
     payload
   );
   return data;
 }
 export async function deletePriceListItem(priceListId: string, itemId: string) {
-  await api.delete(`/products/price-lists/${priceListId}/items/${itemId}`);
+  await api.delete(`/price-lists/${priceListId}/items/${itemId}`);
 }
 
 
